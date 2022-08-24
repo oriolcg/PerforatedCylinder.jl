@@ -1,0 +1,26 @@
+name = "CNN_NS"
+uuid = "d887b319-b389-4c63-b752-a8b2ff2cb305"
+authors = ["Oriol Colomes oriol.colomes@gmail.com"]
+version = "0.1.0"
+
+[deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+ClusterManagers = "34f1f09b-3a8b-5176-ab39-66d58a4d544e"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Gridap = "56d4f2e9-7ea1-5844-9cf6-b9c51ca7ce8e"
+GridapDistributed = "f9701e48-63b3-45aa-9a63-9bc6c271f355"
+GridapGmsh = "3025c34a-b394-11e9-2a55-3fee550c04c8"
+GridapPETSc = "bcdc36c2-0c3e-11ea-095a-c9dadae499f1"
+MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+PackageCompiler = "9b87118b-4619-50d2-8e1e-99f35a4d4d9d"
+PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
+SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+
+[compat]
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
