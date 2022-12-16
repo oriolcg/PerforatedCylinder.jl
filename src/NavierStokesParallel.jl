@@ -14,21 +14,18 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
 
   # Geometry
   to_logfile("Geometry")
-  DIRICHLET_tags = ["inlet", "top", "bottom", "monopile"]
+  DIRICHLET_tags = ["inlet", "walls", "monopile"]
   FLUID_LABEL = "fluid"
   OUTLET_LABEL = "outlet"
   meshes_path=ENV["CNN_NS_MESHES"]
   full_mesh_path = joinpath(meshes_path,mesh_file)
+  testname = replace(mesh_file,".msh" =>"")
   model =  GmshDiscreteModel(parts,full_mesh_path)
   Ω = Triangulation(model)
   Ω_f = Triangulation(model, tags = "fluid")
-  Ω_s = Triangulation(model, tags = "monopile")
-  Γ_fs = Interface(Ω_f,Ω_s)
-  Γ_fs_to_Γ_S = map_parts(Γ_fs.trians) do trian
-    trian.plus
-  end
-  Γ_S = DistributedTriangulation(Γ_fs_to_Γ_S,model)
+  Γ_S = Boundary(model, tags = "monopile")
   Γ_out = Boundary(model, tags = "outlet")
+  writevtk(model,output_path*"/"*testname)
 
   to_logfile("Measures")
   order = 2
@@ -55,7 +52,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   #u1(x,t) = VectorValue( 1.5 * Vinf * x[2] * ( H - x[2] ) / ( (H/2)^2 ), 0.0 )
   u1(x,t) = VectorValue( Vinf, 0.0 )
   u1(t::Real) = x -> u1(x,t)
-  U0_dirichlet = [u1, u1, u1, u0]
+  U0_dirichlet = [u1, u1, u0]
   f(x) = VectorValue(0.0, 0.0)
   g(x) = 0.0
 

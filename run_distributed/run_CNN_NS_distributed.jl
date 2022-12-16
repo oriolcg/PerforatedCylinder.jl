@@ -29,7 +29,7 @@ redirect_stdio(;stdout=stdout,stderr=stderr) do
     output_path=output_path,
     Δt=0.1,
     tf=400.0,
-    Δtout=0.5,
+    Δtout=10.0,
   )
 end
 #=

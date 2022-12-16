@@ -15,7 +15,8 @@ const forces_dir = data_dir * "/forces/"
 const meshes_dir = data_dir * "/meshes/"
 const OVERWRITE = true
 
-testname = "ID_000001" #* string((((initial_case-1)+(local_case-1))*48 + (MPI.Comm_rank(comm)+1)), pad=6)
+#testname = "ID_000001" #* string((((initial_case-1)+(local_case-1))*48 + (MPI.Comm_rank(comm)+1)), pad=6)
+testname = "tmp_fine"
 println("Testname: $testname")
 mesh_file = meshes_dir * testname * ".msh"
 force_file = forces_dir * testname * ".csv"
@@ -26,16 +27,14 @@ if MPI.Comm_rank(comm)==0
 end
 stdout_file = joinpath(output_path,"stdout")
 stderr_file = joinpath(output_path,"stderr")
-redirect_stdio(; stdout=stdout,stderr=stderr) do
-  CNN_NS.main_parallel(np;
-    mesh_file=mesh_file,
-    force_file=force_file,
-    output_path=output_path,
-    Δt=0.1,
-    tf=0.2,
-    Δtout=0.1,
-  )
-end
+CNN_NS.main_parallel(np;
+  mesh_file=mesh_file,
+  force_file=force_file,
+  output_path=output_path,
+  Δt=0.1,
+  tf=100,
+  Δtout=0.5,
+)
 #=
 
 isdir(forces_dir) || mkdir(forces_dir)

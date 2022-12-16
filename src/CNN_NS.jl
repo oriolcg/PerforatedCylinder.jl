@@ -3,7 +3,7 @@ module CNN_NS
 using Gridap
 using Gridap.FESpaces: zero_free_values, interpolate!
 using Gridap.Fields: meas
-using GridapGmsh
+using GridapGmsh: gmsh, GmshDiscreteModel
 using GridapDistributed
 using GridapDistributed: DistributedTriangulation, DistributedCellField
 using GridapPETSc
@@ -16,9 +16,47 @@ using DataFrames
 
 include("NavierStokesSerial.jl")
 include("NavierStokesParallel.jl")
+include("mesh_generation.jl")
+
+function generate_meshes(nperf=1,nβ=1,nα=1)
+    # Domain Parameters
+  L = 10
+  H = 4
+  D = 1
+  R = D/2
+  t = 0.05
+  Cx = L/2-2R
+  Cy = H/2
+
+  # Mesh Parameters
+  h_coarse = 1.0
+  h_fine = 0.1#2.0e-2
+  dxLeft = 2R
+  dxRight = 6R
+  dyTop = 2R
+  dyBottom = 2R
+  decay_factor = 0.8
+  decay_exponent = 1.0
+
+  # Create cases
+  perforations = 3:3+nperf-1
+  porosities = 0.2:(0.8-0.2)/(nβ-1):0.8
+  angles = 0:15/(nα-1):15
+  for num_perforations in 3:3+nperf
+    for β in porosities
+      for α in angles
+        create_mesh(L, H, D, t, Cx, Cy,
+        num_perforations, β, α,
+        h_coarse, h_fine, dxLeft, dxRight, dyTop, dyBottom,
+        decay_factor, decay_exponent)
+      end
+    end
+  end
+
+end
 
 function main_parallel(np;
-  mesh_file="test_conformal_mesh_coarse.msh",
+  mesh_file="tmp_coarse.msh",
   force_file="forces.csv",
   output_path="tmp",
   Δt=0.5,
@@ -33,7 +71,7 @@ function main_parallel(np;
 end
 
 function main_parallel_sequential(np;
-  mesh_file="test_conformal_mesh_coarse.msh",
+  mesh_file="tmp_coarse.msh",
   force_file="forces.csv",
   output_path="tmp",
   Δt=0.5,
@@ -65,7 +103,7 @@ end
 # end
 
 function main_serial(;
-  mesh_file="test_conformal_mesh_coarse.msh",
+  mesh_file="tmp_coarse.msh",
   force_file="forces.csv",
   output_path="tmp",
   Δt=0.5,
