@@ -11,14 +11,16 @@ function create_mesh(
   β = 0.3,
   α = 30,
   # Mesh Parameters
-  h_coarse = 1.0,
-  h_fine = 0.5,
-  dxLeft = 1,
-  dxRight = 3,
-  dyTop = 1,
-  dyBottom = 1,
-  decay_factor = 0.8,
-  decay_exponent = 1.0,
+  h_coarse = 0.3,
+  h_fine = 1.0e-2,
+  dxLeft = 0.5,
+  dxRight = 6,
+  dyTop = 0.5,
+  dyBottom = 0.5,
+  decay_factor_left = 5,
+  decay_factor_right = 1.5,
+  decay_exponent_left = 0.8,
+  decay_exponent_right = 0.8,
   )
 
   # Domain Parameters
@@ -43,13 +45,8 @@ function create_mesh(
   w = θ*R
   l = R+2t
   perforations = []
-  println(num_perforations)
   for i in 1:num_perforations
     tmp1 = gmsh.model.occ.addRectangle(Cx-w/2,Cy-l,0,w,l)
-    println(tmp1)
-    println(" - ",gmsh.model.occ.getEntities())
-    gmsh.model.occ.synchronize()
-    println(" - ",gmsh.model.occ.getEntities())
     gmsh.model.occ.rotate((2,tmp1),Cx,Cy,0,0,0,1,(i-1)*ϕ+α/180*π)
     tmp2 = gmsh.model.occ.intersect((2,tmp1),monopile[1][end],-1,true,false)
     push!(perforations,tmp2)
@@ -92,6 +89,8 @@ function create_mesh(
   monopile_point_tags = [ entity[2] for entity in monopile_point]
   monopile_line_tags = [ entity[2] for entity in monopile_line]
 
+  println("fluid_domain", fluid_domain)
+
   # Physical group
   gmsh.model.addPhysicalGroup(0,inlet_point_tags,1,"inlet")
   gmsh.model.addPhysicalGroup(1,inlet_line_tags,1,"inlet")
@@ -109,20 +108,26 @@ function create_mesh(
 
   # Define mesh size
   function meshSizeCallback(dim,tag,x,y,z,lc)
-    if (Cx-R-dxLeft)<x<(Cx+R+dxRight) && (Cy-R-dyBottom)<y<(Cy+R+dyTop)
+    if (Cx-R-dxLeft)<x<(Cx) && √((x-Cx)^2+(y-Cy)^2) < (R+dxLeft)
       dist = abs(√((x-Cx)^2+(y-Cy)^2) - R)/R
-      return min(h_fine * (1 + decay_factor * (dist^decay_exponent)), h_coarse)
+      return min(h_fine * (1 + decay_factor_left * (dist^decay_exponent_left)), h_coarse)
+    elseif (Cx)<x<(Cx+R+dxRight) && (Cy-R-dyBottom)<y<(Cy+R+dyTop)
+      dist = abs(√((x-Cx)^2+(y-Cy)^2) - R)/R
+      return min(h_fine * (1 + decay_factor_right * (dist^decay_exponent_right)), h_coarse)
     else
       return h_coarse
     end
   end
   gmsh.model.mesh.setSizeCallback(meshSizeCallback)
+  gmsh.write("tmp.geo_unrolled")
   gmsh.model.mesh.generate()
 
   println(gmsh.model.getEntitiesForPhysicalGroup(2,5))
 
   # Finalize
-  filename = num_perforations * "_" * round(β;digits=2) * "_" * round(α,digits=2) * ".msh"
+  β2 = round(β;digits=2)
+  α2 = round(α,digits=2)
+  filename = "$num_perforations-$β2-$α2.msh"
   meshes_path=ENV["CNN_NS_MESHES"]
   mesh_file = joinpath(meshes_path,filename)
   gmsh.write(mesh_file)
