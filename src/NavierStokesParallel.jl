@@ -122,14 +122,16 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  # hmap = map_parts(Ω_f.trians) do trian
-  #   get_cell_measure(trian)
-  # end
-  # h2 = DistributedCellField(hmap)
-  # h = lazy_map(dx->dx^(1/2),h2)
-  h = 0.05
-  τₘ = 1/(c₁*ν_f/h^2 + c₂*(meas∘uₙₕ)/h)
-  τc = cc *(h^2/(c₁*τₘ))
+  h2map = map_parts(Ω_f.trians) do trian
+    CellField(get_cell_measure(trian),trian)
+  end
+  h2 = DistributedCellField(h2map)
+  hmap = map_parts(Ω_f.trians) do trian
+    CellField(lazy_map(dx->dx^(1/2),get_cell_measure(trian)),trian)
+  end
+  h = DistributedCellField(hmap)
+  τₘ = 1/(c₁*ν_f/h2 + c₂*(meas∘uₙₕ)/h)
+  τc = cc *(h2/(c₁*τₘ))
 
   # Weak form
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
