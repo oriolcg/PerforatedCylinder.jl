@@ -17,22 +17,29 @@ const OVERWRITE = true
 
 #testname = "ID_000001" #* string((((initial_case-1)+(local_case-1))*48 + (MPI.Comm_rank(comm)+1)), pad=6)
 testname = "tmp_fine"
-println("Testname: $testname")
+testname2 = testname*"_$np"
 mesh_file = meshes_dir * testname * ".msh"
-force_file = forces_dir * testname * ".csv"
-output_path = joinpath(pwd(),"results_"*testname)
-println("Running test case " * testname)
+force_file = forces_dir * testname2 * ".csv"
+output_path = "results_"*testname2
 if MPI.Comm_rank(comm)==0
   isdir(output_path) || mkdir(output_path)
 end
+MPI.Barrier(comm)
 stdout_file = joinpath(output_path,"stdout")
 stderr_file = joinpath(output_path,"stderr")
+if MPI.Comm_rank(comm)==0
+  println("Testname: $testname")
+  println("mesh_file: ",mesh_file)
+  println("force_file: ",force_file)
+  println("output_path: ",output_path)
+  println("Running test case " * testname)
+end
 CNN_NS.main_parallel(np;
   mesh_file=mesh_file,
   force_file=force_file,
   output_path=output_path,
-  Δt=0.1,
-  tf=100,
+  Δt=0.02,
+  tf=0.2,
   Δtout=0.5,
 )
 #=
