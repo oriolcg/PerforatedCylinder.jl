@@ -20,6 +20,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   OUTLET_LABEL = "outlet"
   meshes_path=ENV["CNN_NS_MESHES"]
   full_mesh_path = joinpath(meshes_path,mesh_file)
+  to_logfile("Mesh file: ",full_mesh_path)
   testname = replace(mesh_file,".msh" =>"")
   model =  GmshDiscreteModel(parts,full_mesh_path)
   Ω = Triangulation(model)
