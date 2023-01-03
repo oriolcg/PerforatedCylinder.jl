@@ -1,7 +1,8 @@
 function run_test_parallel(parts,mesh_file::String,force_file::String,output_path,Δt,tf,Δtout)
 
   if i_am_main(parts)
-    io = open(output_path*".log", "w")
+    isdir(output_path) || mkdir(output_path)
+    io = open(output_path*"/output.log", "w")
     io_force = open(force_file, "w")
   end
   function to_logfile(x...)
@@ -25,7 +26,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   Ω_f = Triangulation(model, tags = "fluid")
   Γ_S = Boundary(model, tags = "monopile")
   Γ_out = Boundary(model, tags = "outlet")
-  writevtk(model,output_path*"/"*testname)
+  writevtk(model,testname)
 
   to_logfile("Measures")
   order = 2
@@ -157,7 +158,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
 
   # NS operator
   op = TransientFEOperator(res,jac,jac_t, X, Y)
-  # Linear Solver
+
+  # Nonlinear Solver
   nls = PETScNonlinearSolver()
 
   # Nonlinear Solver
@@ -175,7 +177,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   FD = Float64[]
   FL = Float64[]
   global tout = 0
-   createpvd(parts,output_path*"/NS_test") do pvd
+   createpvd(parts,"NS_test") do pvd
     for ((uh,ph),t) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
@@ -183,7 +185,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
       push!(FD,FR[1])
       push!(FL,FR[2])
       if t>tout
-        pvd[t] = createvtk(Ω,output_path*"/NS_test_$t"*".vtu",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
         tout=t+Δtout
       end
       uₙₕ = interpolate!(uh,fv_u,U(t))
