@@ -1,8 +1,7 @@
-function run_test_parallel(parts,mesh_file::String,force_file::String,output_path,Δt,tf,Δtout)
+function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   if i_am_main(parts)
-    isdir(output_path) || mkdir(output_path)
-    io = open(output_path*"/output.log", "w")
+    io = open("output.log", "w")
     forces_path=ENV["PerforatedCylinder_FORCES"]
     full_force_path = joinpath(forces_path,force_file)
     io_force = open(full_force_path, "w")
@@ -49,10 +48,10 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
 
   # Physics parameters
   to_logfile("Parameters")
-  rho = 1.025 * 10^3 # kg/m^3
+  rho = 1.025e3 # kg/m^3
   Vinf = 1 # m/s
   D = 10 # m
-  Re = 1.0e6 #0
+  # Re = 1.0e6 #0
   H = 24 # m
   μ_f = 1.0e-3# rho * Vinf * D / Re #0.01 # Fluid viscosity
   ν_f = μ_f / rho # kinematic viscosity
@@ -180,7 +179,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
     println("Postprocess")
   end
   global tout = 0
-   createpvd(parts,"NS_test") do pvd
+  createpvd(parts,"NS_test") do pvd
     for ((uh,ph),t) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
