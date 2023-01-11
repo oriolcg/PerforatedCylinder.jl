@@ -145,10 +145,10 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
 
   # Weak form
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
-  res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ν_f*(∇(u)⊙∇(v)) - p*(∇⋅v) + (∇⋅u)*q +
+  res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
                           τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
-  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ν_f*(∇(du)⊙∇(v)) - dp*(∇⋅v) + (∇⋅du)*q +
+  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - dp*(∇⋅v) + (∇⋅du)*q +
                                   τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
                                   τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
                                ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
@@ -160,13 +160,6 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   bη(κ) = ∫( τₘ*((∇(uₙₕ)'⋅uₙₕ)⋅κ) )dΩ_f
   op_proj = AffineFEOperator(aη,bη,U(0.0),V)
   ls_proj = PETScLinearSolver()
-
-  # # Define residual
-  # res(t,(u, p), (v, q)) = ∫( ∂t(u)⋅v   + (∇(u)'⋅u) ⋅ v + ε(v) ⊙ (σ_dev_f ∘ ε(u))
-  # - (∇ ⋅ v) * p + q * (∇ ⋅ u)   )dΩ_f#+ stab(u,p,v,q) )dΩ_f
-  # jac(t,(u,p),(du,dp),(v,q)) = ∫( (∇(du)'⋅u) ⋅ v + (∇(u)'⋅du) ⋅ v + ε(v) ⊙ (σ_dev_f ∘ ε(du))
-  # - (∇ ⋅ v) * dp + q * (∇ ⋅ du)   )dΩ_f
-  # jac_t(t,(u, p),(dut,), (v, q)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
   op = TransientFEOperator(res,jac,jac_t, X, Y)
@@ -191,8 +184,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
     for ((uh,ph),t) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
-      F = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
-      to_forcefile(F)
+      Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
+      to_forcefile(t,Fx,Fy)
       if t>tout
         pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
         tout=t+Δtout
