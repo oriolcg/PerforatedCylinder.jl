@@ -1,11 +1,12 @@
 using PerforatedCylinder
 
 println("generating meshes...")
-nbeta = 3
-nalpha = 3
+nbeta = 20
+nalpha = 1
+nperfs = 40
 perf_cases = [3,9,27]
 porosities = 0.3:(0.7-0.3)/(nbeta-1):0.7
-alphas = 0.0:15.0/(nalpha-1):15.0
+alphas = [0.0]#:15.0/(nalpha-1):15.0
 for num_perforations in perf_cases
   for β in porosities
     for α in alphas

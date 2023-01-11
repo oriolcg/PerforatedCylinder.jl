@@ -8,4 +8,4 @@ export JULIA_MPIEXEC=srun
 export JULIA_PETSC_LIBRARY=$HOME/progs/install/petsc/3.15.4/lib/libpetsc.so
 export PerforatedCylinder_MESHES=/gpfs/scratch1/nodespecific/int1/colomeso/tests/PerforatedCylinder.jl/data/meshes
 export PerforatedCylinder_FORCES=/gpfs/scratch1/nodespecific/int1/colomeso/tests/PerforatedCylinder.jl/data/forces 
-export PerforatedCylinder_RESULTS=/gpfs/scratch1/nodespecific/int1/colomeso/tests/PerforatedCylinder.jl 
+export PerforatedCylinder_VTKs=/gpfs/scratch1/nodespecific/int1/colomeso/tests/PerforatedCylinder.jl/data/VTKs
