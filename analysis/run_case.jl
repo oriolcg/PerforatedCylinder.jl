@@ -1,7 +1,7 @@
 using MPI
 MPI.Init()
 comm = MPI.COMM_WORLD
-using CNN_NS
+using PerforatedCylinder
 
 # Paths
 const project_root = ".."
@@ -45,7 +45,7 @@ if MPI.Comm_rank(comm)==0
 end
 
 # Run case
-CNN_NS.main_parallel(np;
+PerforatedCylinder.main_parallel(np;
   mesh_file=mesh_file,
   force_file=force_file,
   output_path=output_path,

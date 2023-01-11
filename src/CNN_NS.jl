@@ -1,4 +1,4 @@
-module CNN_NS
+module PerforatedCylinder
 
 using Gridap
 using Gridap.FESpaces: zero_free_values, interpolate!

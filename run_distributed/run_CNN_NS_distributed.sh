@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 #SBATCH --account=research-ceg-he
-#SBATCH --job-name="CNN_NS"
+#SBATCH --job-name="PerforatedCylinder"
 #SBATCH --partition=compute
 #SBATCH --time=3-00:00:00
 #SBATCH --nodes=1
@@ -14,4 +14,4 @@
 
 source ../compile/modules.sh
 
-mpiexecjl --project=../ -n 48 $HOME/progs/install/julia/1.7.2/bin/julia -J ../CNN_NS_serial.so -O3 --check-bounds=no -e 'include("run_CNN_NS_distributed.jl")'
+mpiexecjl --project=../ -n 48 $HOME/progs/install/julia/1.7.2/bin/julia -J ../PerforatedCylinder_serial.so -O3 --check-bounds=no -e 'include("run_PerforatedCylinder_distributed.jl")'

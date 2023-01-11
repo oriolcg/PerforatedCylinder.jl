@@ -1,4 +1,4 @@
-name = "CNN_NS"
+name = "PerforatedCylinder"
 uuid = "d887b319-b389-4c63-b752-a8b2ff2cb305"
 authors = ["Oriol Colomes oriol.colomes@gmail.com"]
 version = "0.1.0"

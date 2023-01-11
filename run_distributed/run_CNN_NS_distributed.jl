@@ -4,7 +4,7 @@ comm = MPI.COMM_WORLD
 initial_case = parse(Int,ENV["INITIAL_CASE"])
 local_case = parse(Int,ENV["LOCAL_CASE"])
 
-using CNN_NS
+using PerforatedCylinder
 
 # Paths
 const project_root = ".."
@@ -23,7 +23,7 @@ isdir(output_path) || mkdir(output_path)
 stdout_file = joinpath(output_path,"stdout")
 stderr_file = joinpath(output_path,"stderr")
 redirect_stdio(;stdout=stdout,stderr=stderr) do
-  CNN_NS.main_serial(;
+  PerforatedCylinder.main_serial(;
     mesh_file=mesh_file,
     force_file=force_file,
     output_path=output_path,
@@ -68,7 +68,7 @@ function main()
             output_path = joinpath(pwd(),"results_"*testname)
             println("Running test case " * testname)
             isdir(output_path) || mkdir(output_path)
-            FD,FL = CNN_NS.main_serial(;mesh_file=mesh_path,Δt=0.05,tf=200,write_vtk=false,output_path)
+            FD,FL = PerforatedCylinderatedCylinder.main_serial(;mesh_file=mesh_path,Δt=0.05,tf=200,write_vtk=false,output_path)
             CSV.write(forces_file, DataFrame(FD = FD, FL = FL))
         end
       end

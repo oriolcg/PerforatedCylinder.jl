@@ -13,7 +13,7 @@ function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf
   DIRICHLET_tags = ["inlet", "top", "bottom", "monopile"]
   FLUID_LABEL = "fluid"
   OUTLET_LABEL = "outlet"
-  meshes_path=ENV["CNN_NS_MESHES"]
+  meshes_path=ENV["PerforatedCylinder_MESHES"]
   full_mesh_path = joinpath(meshes_path,mesh_file)
   model =  GmshDiscreteModel(full_mesh_path)
   Ω = Triangulation(model)

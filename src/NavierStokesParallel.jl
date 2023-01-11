@@ -3,7 +3,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   if i_am_main(parts)
     isdir(output_path) || mkdir(output_path)
     io = open(output_path*"/output.log", "w")
-    forces_path=ENV["CNN_NS_FORCES"]
+    forces_path=ENV["PerforatedCylinder_FORCES"]
     full_force_path = joinpath(forces_path,force_file)
     io_force = open(full_force_path, "w")
   end
@@ -27,7 +27,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   DIRICHLET_tags = ["inlet", "walls", "monopile"]
   FLUID_LABEL = "fluid"
   OUTLET_LABEL = "outlet"
-  meshes_path=ENV["CNN_NS_MESHES"]
+  meshes_path=ENV["PerforatedCylinder_MESHES"]
   full_mesh_path = joinpath(meshes_path,mesh_file)
   to_logfile("Mesh file: ",full_mesh_path)
   testname = replace(mesh_file,".msh" =>"")

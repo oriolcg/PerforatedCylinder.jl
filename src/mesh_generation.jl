@@ -127,7 +127,7 @@ function create_mesh(;
   β2 = round(β;digits=2)
   α2 = round(α,digits=2)
   filename = "$num_perforations-$β2-$α2.msh"
-  meshes_path=ENV["CNN_NS_MESHES"]
+  meshes_path=ENV["PerforatedCylinder_MESHES"]
   mesh_file = joinpath(meshes_path,filename)
   gmsh.write(mesh_file)
   gmsh.finalize()

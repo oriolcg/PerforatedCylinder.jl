@@ -4,5 +4,5 @@
 #do
     export INITIAL_CASE=$1 
     export LOCAL_CASE=1 #$i
-    sbatch run_CNN_NS_distributed.sh
+    sbatch run_PerforatedCylinder_distributed.sh
 #done

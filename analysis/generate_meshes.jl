@@ -1,4 +1,4 @@
-using CNN_NS
+using PerforatedCylinder
 
 println("generating meshes...")
 nbeta = 3
@@ -10,7 +10,7 @@ for num_perforations in perf_cases
   for β in porosities
     for α in alphas
       println(num_perforations,"-",β,"-",α)
-      CNN_NS.create_mesh(num_perforations = num_perforations, β = β, α = α)
+      PerforatedCylinder.create_mesh(num_perforations = num_perforations, β = β, α = α)
     end
   end
 end

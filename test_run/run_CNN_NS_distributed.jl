@@ -2,7 +2,7 @@ using MPI
 MPI.Init()
 comm = MPI.COMM_WORLD
 
-using CNN_NS
+using PerforatedCylinder
 using CSV
 using DataFrames
 
@@ -19,7 +19,7 @@ force_file = forces_dir * testname * ".csv"
 output_path = joinpath(pwd(),"results_"*testname)
 println("Running test case " * testname)
 isdir(output_path) || mkdir(output_path)
-FD,FL = CNN_NS.main_serial(;
+FD,FL = PerforatedCylinder.main_serial(;
   mesh_file=mesh_file,
   Δt=0.05,
   tf=200.0,
@@ -65,7 +65,7 @@ function main()
             output_path = joinpath(pwd(),"results_"*testname)
             println("Running test case " * testname)
             isdir(output_path) || mkdir(output_path)
-            FD,FL = CNN_NS.main_serial(;mesh_file=mesh_path,Δt=0.05,tf=200,write_vtk=false,output_path)
+            FD,FL = PerforatedCylinder.main_serial(;mesh_file=mesh_path,Δt=0.05,tf=200,write_vtk=false,output_path)
             CSV.write(forces_file, DataFrame(FD = FD, FL = FL))
         end
       end

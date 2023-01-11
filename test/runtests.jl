@@ -1,6 +1,6 @@
-using CNN_NS
+using PerforatedCylinder
 using Test
 
-@testset "CNN_NS.jl" begin
+@testset "PerforatedCylinder.jl" begin
     # Write your tests here.
 end

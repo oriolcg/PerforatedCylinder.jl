@@ -1,4 +1,4 @@
-using CNN_NS
-# CNN_NS.main_serial()
-CNN_NS.generate_meshes()
-CNN_NS.main_parallel(1)
+using PerforatedCylinder
+# PerforatedCylinder.main_serial()
+PerforatedCylinder.generate_meshes()
+PerforatedCylinder.main_parallel(1)

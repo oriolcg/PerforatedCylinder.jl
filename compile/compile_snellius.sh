@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="compile_CNN_NS"
+#SBATCH --job-name="compile_PerforatedCylinder"
 #SBATCH -p thin
 #SBATCH -t 01:00:00
 #SBATCH -n 1
