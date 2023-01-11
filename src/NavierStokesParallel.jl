@@ -3,13 +3,22 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   if i_am_main(parts)
     isdir(output_path) || mkdir(output_path)
     io = open(output_path*"/output.log", "w")
-    io_force = open(force_file, "w")
+    forces_path=ENV["CNN_NS_FORCES"]
+    full_force_path = joinpath(forces_path,force_file)
+    io_force = open(full_force_path, "w")
   end
   function to_logfile(x...)
     if i_am_main(parts)
       write(io,join(x, " ")...)
       write(io,"\n")
       flush(io)
+    end
+  end
+  function to_forcefile(x...)
+    if i_am_main(parts)
+      write(io_force,join(x, " ")...)
+      write(io_force,"\n")
+      flush(io_force)
     end
   end
 
@@ -177,16 +186,13 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
   if i_am_main(parts)
     println("Postprocess")
   end
-  FD = Float64[]
-  FL = Float64[]
   global tout = 0
    createpvd(parts,"NS_test") do pvd
     for ((uh,ph),t) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
-      FR = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
-      push!(FD,FR[1])
-      push!(FL,FR[2])
+      F = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
+      to_forcefile(F)
       if t>tout
         pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
         tout=t+Δtout
@@ -196,5 +202,10 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,output_pat
     end
   end
 
-  return FD, FL
+  if i_am_main(parts)
+    close(io)
+    close(io_force)
+  end
+
+  return nothing
 end
