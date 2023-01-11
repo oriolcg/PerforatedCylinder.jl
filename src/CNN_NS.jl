@@ -19,36 +19,14 @@ include("NavierStokesParallel.jl")
 include("mesh_generation.jl")
 
 function generate_meshes(nperf=1,nβ=1,nα=1)
-    # Domain Parameters
-  L = 10
-  H = 4
-  D = 1
-  R = D/2
-  t = 0.05
-  Cx = L/2-2R
-  Cy = H/2
-
-  # Mesh Parameters
-  h_coarse = 1.0
-  h_fine = 0.1#2.0e-2
-  dxLeft = 2R
-  dxRight = 6R
-  dyTop = 2R
-  dyBottom = 2R
-  decay_factor = 0.8
-  decay_exponent = 1.0
-
   # Create cases
-  perforations = 3:3+nperf-1
-  porosities = 0.2:(0.8-0.2)/(nβ-1):0.8
-  angles = 0:15/(nα-1):15
+  perforations = 3:3+nperf
+  porosities = 0.2:(0.8-0.2)/(nβ):0.8
+  angles = 0:15/(nα):15
   for num_perforations in 3:3+nperf
     for β in porosities
       for α in angles
-        create_mesh(L, H, D, t, Cx, Cy,
-        num_perforations, β, α,
-        h_coarse, h_fine, dxLeft, dxRight, dyTop, dyBottom,
-        decay_factor, decay_exponent)
+        create_mesh(num_perforations = num_perforations, β = β, α = α)
       end
     end
   end

@@ -1,4 +1,4 @@
-function create_mesh(
+function create_mesh(;
   # Domain Parameters
   L = 10,
   H = 4,
@@ -119,7 +119,6 @@ function create_mesh(
     end
   end
   gmsh.model.mesh.setSizeCallback(meshSizeCallback)
-  gmsh.write("tmp.geo_unrolled")
   gmsh.model.mesh.generate()
 
   println(gmsh.model.getEntitiesForPhysicalGroup(2,5))
