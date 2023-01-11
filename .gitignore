@@ -16,6 +16,7 @@ tmp/
 *.out
 *.log
 *.tgz
+*.err
 
 stdout
 stderr
