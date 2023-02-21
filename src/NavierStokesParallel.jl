@@ -152,7 +152,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
                                   τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
                                ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
   jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
-  op = TransientFEOperator(res,jac,jac_t,X,Y)
+  # op = TransientFEOperator(res,jac,jac_t,X,Y)
+  op = TransientFEOperator(res,X,Y)
 
   # Orthogonal projection
   aη(η,κ) = ∫( τₘ*(η⋅κ) )dΩ_f
