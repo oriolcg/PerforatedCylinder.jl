@@ -118,11 +118,11 @@ c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
 res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
                         τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc*((∇⋅u)*(∇⋅v)) )dΩ_f +
                      ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
-# jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - dp*(∇⋅v) + (∇⋅du)*q +
-# τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-# τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
-# ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
-# jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
+jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
+τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
+τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
+∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
+jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
 
 # Orthogonal projection
 aη(η,κ) = ∫( τₘ*(η⋅κ) )dΩ_f
@@ -131,8 +131,8 @@ op_proj = AffineFEOperator(aη,bη,U(0.0),V)
 # ls_proj = PETScLinearSolver()
 
 # NS operator
-# op = TransientFEOperator(res,jac,jac_t, X, Y)
-op = TransientFEOperator(res,X, Y)
+op = TransientFEOperator(res,jac,jac_t, X, Y)
+# op = TransientFEOperator(res,X, Y)
 
 # Nonlinear Solver
 # nls = PETScNonlinearSolver()
