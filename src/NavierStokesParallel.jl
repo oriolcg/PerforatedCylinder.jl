@@ -76,8 +76,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   reffeₚ = ReferenceFE(lagrangian, Float64, order - 1)#,space=:P)
 
   # Define test FESpaces
-  V = TestFESpace(Ω_f, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, conformity = :H1)
-  Q = TestFESpace(Ω_f, reffeₚ,   conformity= :C0)
+  V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, conformity = :H1)
+  Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Y = MultiFieldFESpace([V, Q])
 
   # Define trial FESpaces from Dirichlet values
@@ -147,13 +147,11 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
                           τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
-  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - dp*(∇⋅v) + (∇⋅du)*q +
-                                  τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-                                  τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
-                               ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
-  jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
-  # op = TransientFEOperator(res,jac,jac_t,X,Y)
-  op = TransientFEOperator(res,X,Y)
+  # jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - dp*(∇⋅v) + (∇⋅du)*q +
+  #                                 τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
+  #                                 τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
+  #                              ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
+  # jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
 
   # Orthogonal projection
   aη(η,κ) = ∫( τₘ*(η⋅κ) )dΩ_f
@@ -162,7 +160,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   ls_proj = PETScLinearSolver()
 
   # NS operator
-  op = TransientFEOperator(res,jac,jac_t, X, Y)
+  op = TransientFEOperator(res, X, Y)
 
   # Nonlinear Solver
   nls = PETScNonlinearSolver()
