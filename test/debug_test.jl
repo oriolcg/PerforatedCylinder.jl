@@ -55,13 +55,19 @@ H = 24 # m
 ν_f = μ_f / rho # kinematic viscosity
 
 # Boundary conditions and external loads
-u0(x, t) = VectorValue(0.0, 0.0)
+dims = num_dims(model)
+if dims==2
+  u0(x, t) = VectorValue(0.0, 0.0)
+  u1(x,t) = VectorValue( Vinf, 0.0 )
+  f(x) = VectorValue(0.0, 0.0)
+elseif dims == 3
+  u0(x, t) = VectorValue(0.0, 0.0, 0.0)
+  u1(x,t) = VectorValue( Vinf, 0.0, 0.0 )
+  f(x) = VectorValue(0.0, 0.0, 0.0)
+end
 u0(t::Real) = x -> u0(x,t)
-#u1(x,t) = VectorValue( 1.5 * Vinf * x[2] * ( H - x[2] ) / ( (H/2)^2 ), 0.0 )
-u1(x,t) = VectorValue( Vinf, 0.0 )
 u1(t::Real) = x -> u1(x,t)
 U0_dirichlet = [u1, u1, u0]
-f(x) = VectorValue(0.0, 0.0)
 g(x) = 0.0
 
 # ODE solver
