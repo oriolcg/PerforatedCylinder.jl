@@ -55,18 +55,15 @@ H = 24 # m
 ν_f = μ_f / rho # kinematic viscosity
 
 # Boundary conditions and external loads
-dims = num_dims(model)
-if dims==2
-  u0(x, t) = VectorValue(0.0, 0.0)
-  u1(x,t) = VectorValue( Vinf, 0.0 )
-  f(x) = VectorValue(0.0, 0.0)
-elseif dims == 3
-  u0(x, t) = VectorValue(0.0, 0.0, 0.0)
-  u1(x,t) = VectorValue( Vinf, 0.0, 0.0 )
-  f(x) = VectorValue(0.0, 0.0, 0.0)
-end
-u0(t::Real) = x -> u0(x,t)
-u1(t::Real) = x -> u1(x,t)
+dims = num_cell_dims(model)
+u0(x,t,::Val{2}) = VectorValue(0.0, 0.0)
+u1(x,t,::Val{2}) = VectorValue( Vinf, 0.0 )
+u0(x,t,::Val{3}) = VectorValue(0.0, 0.0, 0.0)
+u1(x,t,::Val{3}) = VectorValue( Vinf, 0.0, 0.0 )
+u0(x,t::Real) = u0(x,t,Val(dims))
+u1(x,t::Real) = u1(x,t,Val(dims))
+u0(t::Real) = x -> u0(x,t,Val(dims))
+u1(t::Real) = x -> u1(x,t,Val(dims))
 U0_dirichlet = [u1, u1, u0]
 g(x) = 0.0
 
@@ -76,7 +73,7 @@ t₀ = 0.0 # start [s]
 
 to_logfile("FE spaces")
 # ReferenceFE
-reffeᵤ = ReferenceFE(lagrangian, VectorValue{2,Float64}, order)#,space=:P)
+reffeᵤ = ReferenceFE(lagrangian, VectorValue{dims,Float64}, order)#,space=:P)
 reffeₚ = ReferenceFE(lagrangian, Float64, order - 1)#,space=:P)
 
 # Define test FESpaces
