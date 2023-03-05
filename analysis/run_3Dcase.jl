@@ -10,9 +10,9 @@ const OVERWRITE = true
 
 # Set filenames
 np = MPI.Comm_size(comm)
-testname = "3D_monopile"
-mesh_file = "3D_monopile.msh"
-force_file = "3D_monopile.csv"
+testname = "3D_monopile_coarse"
+mesh_file = "3D_monopile_coarse.msh"
+force_file = "3D_monopile_coarse.csv"
 vtks_path = ENV["PerforatedCylinder_VTKs"]
 output_path = joinpath(vtks_path,"results_"*testname)
 if isdir(output_path)
