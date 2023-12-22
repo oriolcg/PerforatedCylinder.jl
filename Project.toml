@@ -15,9 +15,12 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 PackageCompiler = "9b87118b-4619-50d2-8e1e-99f35a4d4d9d"
 PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
 SparseMatricesCSR = "a0a7dd2c-ebf4-11e9-1f05-cf50bc540ca1"
+gmsh_jll = "630162c2-fc9b-58b3-9910-8442a8a132e6"
 
 [compat]
 julia = "1.6"
+gmsh_jll = "4.7.1"
+MPI = "0.19"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

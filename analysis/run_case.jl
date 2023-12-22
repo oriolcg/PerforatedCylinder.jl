@@ -12,8 +12,8 @@ const OVERWRITE = true
 nbeta = 20
 nalpha = 1
 nperfs = 40
-perf_cases = [3,9,27]
-porosities = 0.3:(0.7-0.3)/(nbeta-1):0.7
+perf_cases = [3]#[3,9,27]
+porosities = [0.3]#0.3:(0.7-0.3)/(nbeta-1):0.7
 alphas = [0.0]#:15.0/(nalpha-1):15.0
 cases = []
 for num_perforations in perf_cases
@@ -56,9 +56,10 @@ MPI.Barrier(comm)
 PerforatedCylinder.main_parallel(np;
   mesh_file=mesh_file,
   force_file=force_file,
+  output_path=output_path,
   Δt=0.05,
-  tf=100,
-  Δtout=0.5,
+  tf=10,
+  Δtout=0.0,
 )
 
 MPI.Finalize()

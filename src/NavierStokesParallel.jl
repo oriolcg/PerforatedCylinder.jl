@@ -24,6 +24,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   # Geometry
   to_logfile("Geometry")
   DIRICHLET_tags = ["inlet", "walls", "monopile"]
+  DIRICHLET_masks = [(true,true),(false,true),(true,true)]
   FLUID_LABEL = "fluid"
   OUTLET_LABEL = "outlet"
   meshes_path=ENV["PerforatedCylinder_MESHES"]
@@ -81,14 +82,16 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   reffeₚ = ReferenceFE(lagrangian, Float64, order - 1)#,space=:P)
 
   # Define test FESpaces
-  V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, conformity = :H1)
+  V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
   Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Y = MultiFieldFESpace([V, Q])
+  Κ = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
 
   # Define trial FESpaces from Dirichlet values
   U = TransientTrialFESpace(V, U0_dirichlet)
   P = TrialFESpace(Q)
   X = TransientMultiFieldFESpace([U, P])
+  Η = TrialFESpace(Κ,[u0(0.0), u0(0.0), u0(0.0)])
 
   # Stokes for pre-initalize NS
   σ_dev_f(ε) = 2 * ν_f * ε #  Cauchy stress tensor for the fluid
@@ -108,7 +111,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
     @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
     @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
     @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  7, 0)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 5000)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
     @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  24, 1)
     # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
     # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
@@ -136,47 +139,59 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  h2map = map_parts(Ω_f.trians) do trian
+  h2map = map(Ω_f.trians) do trian
     CellField(get_cell_measure(trian),trian)
   end
-  h2 = DistributedCellField(h2map)
-  hmap = map_parts(Ω_f.trians) do trian
+  h2 = DistributedCellField(h2map,Ω_f)
+  hmap = map(Ω_f.trians) do trian
     CellField(lazy_map(dx->dx^(1/2),get_cell_measure(trian)),trian)
   end
-  h = DistributedCellField(hmap)
-  τₘ = 1/(c₁*ν_f/h2 + c₂*(meas∘uₙₕ)/h)
-  τc = cc *(h2/(c₁*τₘ))
+  h = DistributedCellField(hmap,Ω_f)
+  τₘ(u) = 1/(c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
+  τc(u) = cc *(h2/(c₁*τₘ(u)))
 
   # Weak form
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
-  res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
-                          τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc*((∇⋅u)*(∇⋅v)) )dΩ_f +
+  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
+  res(t,(u,p),(v,q)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
+                          τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
   jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
-                                  τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-                                  τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
+                                  τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
+                                  τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
                                ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
   jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
 
   # Orthogonal projection
-  aη(η,κ) = ∫( τₘ*(η⋅κ) )dΩ_f
-  bη(κ) = ∫( τₘ*((∇(uₙₕ)'⋅uₙₕ)⋅κ) )dΩ_f
-  op_proj = AffineFEOperator(aη,bη,U(0.0),V)
-  ls_proj = PETScLinearSolver()
+  aη(u) = (η,κ) -> ∫( τₘ(u)*(η⋅κ) )dΩ_f
+  bη(u) = (κ) -> ∫( τₘ(u)*((∇(u)'⋅u)⋅κ) )dΩ_f
+  op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
+  ls_proj = PETScLinearSolver(mykspsetup)
 
   # NS operator
-  op = TransientFEOperator(res, jac, jac_t, X, Y)
+  # op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
+  op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
   # Nonlinear Solver
   nls = PETScNonlinearSolver()
+  ls_mass = PETScLinearSolver(mykspsetup)
 
   # Nonlinear Solver
   #nls = NLSolver(ls,show_trace=true,method=:newton,iterations=10)
 
-  # ODE solver
-  ode_solver = GeneralizedAlpha(nls,Δt,ρ∞)
+  # ODE solvers:
+  # 1 time step with BE to kill spurious oscillations in force
+  ode_solver₁ = ThetaMethod(nls,Δt,1.0)
+  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
 
-  xₜ = solve(ode_solver,op,(xh₀,vh₀),t₀,tf)
+  xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
+  function get_step(xₜ)
+    for (t,x) in xₜ
+      return x
+    end
+  end
+  xh₁ = get_step(xₜ₁)
+  xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁)
 
   # Postprocess
   if i_am_main(parts)
@@ -184,7 +199,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   end
   global tout = 0
   createpvd(parts,"NS_test") do pvd
-    for ((uh,ph),t) in xₜ
+    for (t,(uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
       Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
@@ -194,7 +209,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
         tout=t+Δtout
       end
       uₙₕ = interpolate!(uh,fv_u,U(t))
-      ηₙₕ = solve(ls_proj,op_proj)
+      ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
     end
   end
 

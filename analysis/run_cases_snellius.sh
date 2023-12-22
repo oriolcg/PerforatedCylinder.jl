@@ -1,7 +1,7 @@
 #!/bin/bash
 
 INITIAL_CASE=1
-FINAL_CASE=27
+FINAL_CASE=1
 for i in $(seq $INITIAL_CASE $FINAL_CASE)
 do
     echo "case: $i"

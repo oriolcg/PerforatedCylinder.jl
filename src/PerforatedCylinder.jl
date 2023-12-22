@@ -3,6 +3,7 @@ module PerforatedCylinder
 using Gridap
 using Gridap.FESpaces: zero_free_values, interpolate!
 using Gridap.Fields: meas
+using Gridap.ODEs: SDIRK_3_3, DIMRungeKutta
 using GridapGmsh: gmsh, GmshDiscreteModel
 using GridapDistributed
 using GridapDistributed: DistributedTriangulation, DistributedCellField
@@ -100,11 +101,13 @@ options_mumps = "-snes_type newtonls \
 -snes_linesearch_damping 1.0 \
 -snes_rtol 1.0e-8 \
 -snes_atol 1.0e-10 \
+-snes_max_it 10 \
 -ksp_error_if_not_converged true \
 -ksp_converged_reason -ksp_type preonly \
 -pc_type lu \
 -pc_factor_mat_solver_type mumps \
--mat_mumps_icntl_7 0"
+-mat_mumps_icntl_7 0 \
+-mat_mumps_icntl_14 500000"
 
 
 function main_parallel(np;
@@ -116,10 +119,11 @@ function main_parallel(np;
   Δtout=0.5)
   current_path = pwd()
   cd(output_path)
-  with_backend(MPIBackend(),np) do parts
+  with_mpi() do distribute
     options = options_mumps
+    ranks = distribute_with_mpi(LinearIndices((np,)))
     GridapPETSc.with(args=split(options)) do
-      run_test_parallel(parts,mesh_file,force_file,Δt,tf,Δtout)
+      run_test_parallel(ranks,mesh_file,force_file,Δt,tf,Δtout)
     end
   end
   cd(current_path)
