@@ -147,19 +147,26 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
     CellField(lazy_map(dx->dx^(1/2),get_cell_measure(trian)),trian)
   end
   h = DistributedCellField(hmap,Ω_f)
-  τₘ(u) = 1/(c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
+  τₘ(u) = 1/τₘ⁻¹(u)
   τc(u) = cc *(h2/(c₁*τₘ(u)))
+  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./(u⋅u).^(1/2))
+  dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
+
 
   # Weak form
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
+  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
   res(t,(u,p),(v,q)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
                           τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
   jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
                                   τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-                                  τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
-                               ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
+                                  τc(u)*((∇⋅du)*(∇⋅v)) +
+                                  dτₘ(u,du)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) +
+                                  dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+                                ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
   jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
 
   # Orthogonal projection
@@ -169,8 +176,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   ls_proj = PETScLinearSolver(mykspsetup)
 
   # NS operator
-  # op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
-  op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
+  op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
+  # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
   # Nonlinear Solver
   nls = PETScNonlinearSolver()

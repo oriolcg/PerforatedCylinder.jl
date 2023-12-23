@@ -1,26 +1,34 @@
-function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf,Δtout)
+function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
-  io = open(output_path*".log", "w")
-  io_force = open(force_file, "w")
+  io = open("output.log", "w")
+  forces_path=ENV["PerforatedCylinder_FORCES"]
+  full_force_path = joinpath(forces_path,force_file)
+  io_force = open(full_force_path, "w")
   function to_logfile(x...)
     write(io,join(x, " ")...)
     write(io,"\n")
     flush(io)
   end
+  function to_forcefile(x...)
+    write(io_force,join(x, " ")...)
+    write(io_force,"\n")
+    flush(io_force)
+  end
 
   # Geometry
   to_logfile("Geometry")
-  DIRICHLET_tags = ["inlet", "top", "bottom", "monopile"]
-  FLUID_LABEL = "fluid"
-  OUTLET_LABEL = "outlet"
+  DIRICHLET_tags = ["inlet", "walls", "monopile"]
+  DIRICHLET_masks = [(true,true),(false,true),(true,true)]
   meshes_path=ENV["PerforatedCylinder_MESHES"]
   full_mesh_path = joinpath(meshes_path,mesh_file)
+  to_logfile("Mesh file: ",full_mesh_path)
+  testname = replace(mesh_file,".msh" =>"")
   model =  GmshDiscreteModel(full_mesh_path)
   Ω = Triangulation(model)
   Ω_f = Triangulation(model, tags = "fluid")
-  Ω_s = Triangulation(model, tags = "monopile")
-  Γ_S = Interface(Ω_f,Ω_s).⁺
+  Γ_S = Boundary(model, tags = "monopile")
   Γ_out = Boundary(model, tags = "outlet")
+  writevtk(model,testname)
 
   to_logfile("Measures")
   order = 2
@@ -33,22 +41,24 @@ function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf
 
   # Physics parameters
   to_logfile("Parameters")
-  rho = 1.025 * 10^3 # kg/m^3
+  rho = 1.025e3 # kg/m^3
   Vinf = 1 # m/s
-  D = 10 # m
-  Re = 1.0e6 #0
-  H = 24 # m
   μ_f = 1.0e-3# rho * Vinf * D / Re #0.01 # Fluid viscosity
   ν_f = μ_f / rho # kinematic viscosity
 
   # Boundary conditions and external loads
-  u0(x, t) = VectorValue(0.0, 0.0)
-  u0(t::Real) = x -> u0(x,t)
-  #u1(x,t) = VectorValue( 1.5 * Vinf * x[2] * ( H - x[2] ) / ( (H/2)^2 ), 0.0 )
-  u1(x,t) = VectorValue( Vinf, 0.0 )
-  u1(t::Real) = x -> u1(x,t)
-  U0_dirichlet = [u1, u1, u1, u0]
-  f(x) = VectorValue(0.0, 0.0)
+  dims = num_cell_dims(model)
+  u0(x,t,::Val{2}) = VectorValue(0.0, 0.0)
+  u1(x,t,::Val{2}) = VectorValue( Vinf, 0.0 )
+  u0(x,t,::Val{3}) = VectorValue(0.0, 0.0, 0.0)
+  u1(x,t,::Val{3}) = VectorValue( Vinf, 0.0, 0.0 )
+  u0(x,t::Real) = u0(x,t,Val(dims))
+  u1(x,t::Real) = u1(x,t,Val(dims))
+  u0(t::Real) = x -> u0(x,t,Val(dims))
+  u1(t::Real) = x -> u1(x,t,Val(dims))
+  println(dims)
+  println(typeof(u1(0,0)))
+  U0_dirichlet = [u1, u1, u0]
   g(x) = 0.0
 
   # ODE solver
@@ -57,18 +67,20 @@ function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf
 
   to_logfile("FE spaces")
   # ReferenceFE
-  reffeᵤ = ReferenceFE(lagrangian, VectorValue{2,Float64}, order)#,space=:P)
+  reffeᵤ = ReferenceFE(lagrangian, VectorValue{dims,Float64}, order)#,space=:P)
   reffeₚ = ReferenceFE(lagrangian, Float64, order - 1)#,space=:P)
 
   # Define test FESpaces
-  V = TestFESpace(Ω_f, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, conformity = :H1)
-  Q = TestFESpace(Ω_f, reffeₚ,   conformity= :C0)
+  V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
+  Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Y = MultiFieldFESpace([V, Q])
+  Κ = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
 
   # Define trial FESpaces from Dirichlet values
   U = TransientTrialFESpace(V, U0_dirichlet)
   P = TrialFESpace(Q)
   X = TransientMultiFieldFESpace([U, P])
+  Η = TrialFESpace(Κ,[VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
 
   # Stokes for pre-initalize NS
   σ_dev_f(ε) = 2 * ν_f * ε #  Cauchy stress tensor for the fluid
@@ -78,15 +90,16 @@ function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf
 
   # Linear Solver
   to_logfile("Stokes solve")
-  u_ST, p_ST = solve(stokes_op)
+  ls₀ = LUSolver()
+  u_ST, p_ST = solve(ls₀,stokes_op)
 
   # initial condition NS
   to_logfile("Navier-Stokes operator")
   xh₀ = interpolate_everywhere([u_ST, p_ST],X(0.0))
-  vh₀ = interpolate_everywhere((VectorValue(0.0,0.0),0.0),X(0.0))
+  vh₀ = interpolate_everywhere((u0(0),0.0),X(0.0))
 
   # Explicit FE functions
-  global ηₙₕ = interpolate(VectorValue(0.0,0.0),U(0.0))
+  global ηₙₕ = interpolate(u0(0),U(0.0))
   global uₙₕ = interpolate(u_ST,U(0.0))
   global fv_u = zero_free_values(U(0.0))
 
@@ -94,53 +107,71 @@ function run_test_serial(mesh_file::String,force_file::String,output_path,Δt,tf
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  h = lazy_map(dx->dx^(1/2),get_cell_measure(Ω_f))
-  τₘ = 1/(c₁*ν_f/h.^2 + c₂*(meas∘uₙₕ)/h)
-  τc = cc *(h.^2/(c₁*τₘ))
+  h = CellField(get_cell_measure(Ω_f),Ω_f)
+  h2 = CellField(lazy_map(dx->dx^(1/2),get_cell_measure(Ω_f)),Ω_f)
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
+  τₘ(u) = 1/τₘ⁻¹(u)
+  τc(u) = cc *(h2/(c₁*τₘ(u)))
+  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./(u⋅u).^(1/2))
+  dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
 
   # Weak form
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
-  res(t,(u,p),(v,q)) = ∫( ∂t(u)⋅v  + c(u,u,v) + ν_f*(∇(u)⊙∇(v)) - p*(∇⋅v) + (∇⋅u)*q +
-                          τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc*((∇⋅u)*(∇⋅v)) )dΩ_f +
+  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
+  res(t,(u,p),(v,q)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
+                          τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
-  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ν_f*(∇(du)⊙∇(v)) - dp*(∇⋅v) + (∇⋅du)*q +
-                                  τₘ*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-                                  τc*((∇⋅du)*(∇⋅v)) )dΩ_f +
+  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
+                                  τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
+                                  τc(u)*((∇⋅du)*(∇⋅v)) +
+                                  dτₘ(u,du)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) +
+                                  dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
                                ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
   jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
-  op = TransientFEOperator(res,jac,jac_t,X,Y)
 
   # Orthogonal projection
-  aη(η,κ) = ∫( τₘ*(η⋅κ) )dΩ_f
-  bη(κ) = ∫( τₘ*((∇(uₙₕ)'⋅uₙₕ)⋅κ) )dΩ_f
-  op_proj = AffineFEOperator(aη,bη,U(0.0),V)
+  aη(u) = (η,κ) -> ∫( τₘ(u)*(η⋅κ) )dΩ_f
+  bη(u) = (κ) -> ∫( τₘ(u)*((∇(u)'⋅u)⋅κ) )dΩ_f
+  op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
+  ls_proj = LUSolver()
 
   # NS operator
-  op = TransientFEOperator(res,jac,jac_t, X, Y)
+  op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
+  # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
   # Nonlinear Solver
-  nls = NLSolver(show_trace=false,method=:newton,iterations=10)
+  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10)
+  ls_mass = LUSolver()
 
-  # ODE solver
-  ode_solver = GeneralizedAlpha(nls,Δt,ρ∞)
+  # ODE solvers:
+  # 1 time step with BE to kill spurious oscillations in force
+  ode_solver₁ = ThetaMethod(nls,Δt,1.0)
+  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
 
-  xₜ = solve(ode_solver,op,(xh₀,vh₀),t₀,tf)
+  xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
+  function get_step(xₜ)
+    for (t,x) in xₜ
+      return x
+    end
+  end
+  xh₁ = get_step(xₜ₁)
+  xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁)
 
   # Postprocess
   println("Postprocess")
   global tout = 0
-  createpvd(output_path*"/NS_test") do pvd
-    for ((uh,ph),t) in xₜ
+  createpvd("NS_test") do pvd
+    for (t,(uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
-      FR = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
-      CSV.write(io_force, DataFrame(FD = FR[1], FL = FR[2]); append=true)
-      if t>tout
-        pvd[t] = createvtk(Ω,output_path*"/NS_test_$t"*".vtu",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
+      Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
+      to_forcefile(t,Fx,Fy)
+      uₙₕ = interpolate!(uh,fv_u,U(t))
+      ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
+      if t>=tout
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
         tout=t+Δtout
       end
-      uₙₕ = interpolate!(uh,fv_u,U(t))
-      ηₙₕ = solve(op_proj)
     end
   end
 

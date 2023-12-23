@@ -92,15 +92,23 @@ function create_mesh(;
   println("fluid_domain", fluid_domain)
 
   # Physical group
-  gmsh.model.addPhysicalGroup(0,inlet_point_tags,1,"inlet")
-  gmsh.model.addPhysicalGroup(1,inlet_line_tags,1,"inlet")
-  gmsh.model.addPhysicalGroup(0,outlet_point_tags,2,"outlet")
-  gmsh.model.addPhysicalGroup(1,outlet_line_tags,2,"outlet")
-  gmsh.model.addPhysicalGroup(1,wall_tags,3,"walls")
-  gmsh.model.addPhysicalGroup(0,monopile_point_tags,4,"monopile")
-  gmsh.model.addPhysicalGroup(1,monopile_line_tags,4,"monopile")
+  gmsh.model.addPhysicalGroup(0,inlet_point_tags,1)
+  gmsh.model.addPhysicalGroup(1,inlet_line_tags,1)
+  gmsh.model.addPhysicalGroup(0,outlet_point_tags,2)
+  gmsh.model.addPhysicalGroup(1,outlet_line_tags,2)
+  gmsh.model.addPhysicalGroup(1,wall_tags,3)
+  gmsh.model.addPhysicalGroup(0,monopile_point_tags,4)
+  gmsh.model.addPhysicalGroup(1,monopile_line_tags,4)
   pg1 = gmsh.model.addPhysicalGroup(2,fluid_domain_tags)#,5,"fluid")
   gmsh.model.setPhysicalName(2,pg1,"fluid")
+  gmsh.model.setPhysicalName(0,1,"inlet")
+  gmsh.model.setPhysicalName(1,1,"inlet")
+  gmsh.model.setPhysicalName(0,2,"outlet")
+  gmsh.model.setPhysicalName(1,2,"outlet")
+  gmsh.model.setPhysicalName(1,3,"walls")
+  gmsh.model.setPhysicalName(0,4,"monopile")
+  gmsh.model.setPhysicalName(1,4,"monopile")
+
 
   # Synchronize
   gmsh.model.occ.synchronize()
