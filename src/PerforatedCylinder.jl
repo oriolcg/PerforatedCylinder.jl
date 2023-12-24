@@ -3,7 +3,8 @@ module PerforatedCylinder
 using Gridap
 using Gridap.FESpaces: zero_free_values, interpolate!
 using Gridap.Fields: meas
-using Gridap.ODEs: SDIRK_3_3, DIMRungeKutta
+using Gridap.ODEs: SDIRK_3_3, EXRK_RungeKutta_4_4, SDIRK_Midpoint_1_2
+using Gridap.ODEs: DIMRungeKutta, EXRungeKutta
 using GridapGmsh: gmsh, GmshDiscreteModel
 using GridapDistributed
 using GridapDistributed: DistributedTriangulation, DistributedCellField

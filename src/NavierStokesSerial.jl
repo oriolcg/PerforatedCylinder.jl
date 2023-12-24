@@ -43,7 +43,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   to_logfile("Parameters")
   rho = 1.025e3 # kg/m^3
   Vinf = 1 # m/s
-  μ_f = 1.0e-3# rho * Vinf * D / Re #0.01 # Fluid viscosity
+  μ_f = 1.0e0# rho * Vinf * D / Re #0.01 # Fluid viscosity
   ν_f = μ_f / rho # kinematic viscosity
 
   # Boundary conditions and external loads
@@ -115,38 +115,51 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./(u⋅u).^(1/2))
   dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
 
-  # Weak form
-  c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
-  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p),(v,q)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
-                          τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
-                       ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
-  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
-                                  τₘ(u)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
-                                  τc(u)*((∇⋅du)*(∇⋅v)) +
-                                  dτₘ(u,du)*((∇(u)'⋅u - ηₙₕ)⋅(∇(v)'⋅u)) +
-                                  dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
-                               ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
-  jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
-
   # Orthogonal projection
   aη(u) = (η,κ) -> ∫( τₘ(u)*(η⋅κ) )dΩ_f
   bη(u) = (κ) -> ∫( τₘ(u)*((∇(u)'⋅u)⋅κ) )dΩ_f
   op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
   ls_proj = LUSolver()
+  ηₕ(u) = solve(ls_proj,op_proj(u))
+
+  buffer = Ref{Any}((η=nothing,t=nothing))
+  function η(u,t)
+    if buffer[].t == t
+      return buffer[].η
+    else
+      buffer[] = (η=ηₕ(u),t=t)
+      return buffer[].η
+    end
+  end
+
+  # Weak form
+  c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
+  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
+  res(t,(u,p),(v,q)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
+                          τₘ(u)*((∇(u)'⋅u - η(u,t))⋅(∇(v)'⋅u)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+                       ∫( 0.5*(u⋅v)*(u⋅n_Γout) )dΓout
+  jac(t,(u,p),(du,dp),(v,q)) = ∫( c(du,u,v) + c(u,du,v) + ε(v) ⊙ (σ_dev_f ∘ ε(du)) - dp*(∇⋅v) + (∇⋅du)*q +
+                                  τₘ(u)*((∇(u)'⋅u - η(u,t))⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du)⋅(∇(v)'⋅u)) +
+                                  τc(u)*((∇⋅du)*(∇⋅v)) +
+                                  dτₘ(u,du)*((∇(u)'⋅u - η(u,t))⋅(∇(v)'⋅u)) +
+                                  dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+                               ∫( 0.5*((du⋅v)*(u⋅n_Γout)+(u⋅v)*(du⋅n_Γout)) )dΓout
+  jac_t(t,(u,p),(dut,dpt),(v,q)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
   # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10)
+  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6)
   ls_mass = LUSolver()
 
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
   ode_solver₁ = ThetaMethod(nls,Δt,1.0)
-  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
+  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_Midpoint_1_2()))
+  # ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
+  # ode_solver₂ = EXRungeKutta(ls_mass,Δt,ButcherTableau(EXRK_RungeKutta_4_4()))
 
   xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
   function get_step(xₜ)
@@ -166,10 +179,10 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       to_logfile("=======================")
       Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
       to_forcefile(t,Fx,Fy)
-      uₙₕ = interpolate!(uh,fv_u,U(t))
-      ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
+      # uₙₕ = interpolate!(uh,fv_u,U(t))
+      # ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"un"=>uₙₕ,"eta_n"=>ηₙₕ])
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>η(uh,t)],order=2)
         tout=t+Δtout
       end
     end

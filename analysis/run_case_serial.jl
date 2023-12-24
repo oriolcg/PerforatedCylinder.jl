@@ -10,13 +10,13 @@ ENV["PerforatedCylinder_FORCES"] = data_dir * "/forces/"
 ENV["PerforatedCylinder_MESHES"] = data_dir * "/meshes/"
 
 # Define cases
-nbeta = 20
+nbeta = 21
 nalpha = 1
 nperfs = 40
-perf_cases = [3]#[3,9,27]
-porosities = [0.3]#0.3:(0.7-0.3)/(nbeta-1):0.7
+perf_cases = 3:30
+porosities = 0.3:0.02:0.7
 alphas = [0.0]#:15.0/(nalpha-1):15.0
-cases = []
+cases = ["tmp_coarse"]
 for num_perforations in perf_cases
   for β in porosities
     for α in alphas
@@ -28,26 +28,33 @@ for num_perforations in perf_cases
 end
 
 # Set filenames
-case_id = 1
-testname = cases[case_id]
-mesh_file = testname * ".msh"
-force_file = testname * ".csv"
-vtks_path = ENV["PerforatedCylinder_VTKs"]
-output_path = joinpath(vtks_path,"results_"*testname)
-if isdir(output_path)
-  println("Existing case. Exiting execution without computing.")
-  return nothing
-else
-  mkdir(output_path)
-end
-println("Testname: $testname")
-println("mesh_file: ",mesh_file)
-println("force_file: ",force_file)
-println("output_path: ",output_path)
-println("Running test case " * testname)
+for testname in cases[1:10]
+  mesh_file = testname * ".msh"
+  force_file = testname * ".csv"
+  vtks_path = ENV["PerforatedCylinder_VTKs"]
+  output_path = joinpath(vtks_path,"results_"*testname)
+  if isdir(output_path)
+    println("Existing case. Exiting execution without computing.")
+  else
+    mkdir(output_path)
+  end
+  println("Testname: $testname")
+  println("mesh_file: ",mesh_file)
+  println("force_file: ",force_file)
+  println("output_path: ",output_path)
+  println("Running test case " * testname)
 
-# Run case
-PerforatedCylinder.main_serial(mesh_file,
-  force_file,output_path,0.05,1.0,0.0
-)
+  # Run case
+  if testname == "tmp_coarse"
+    Δt = 0.05
+    tf = Δt
+    Δtout = 0.0
+  else
+    Δt = 0.05
+    tf = 10.0
+    Δtout = 0.0
+  end
+  PerforatedCylinder.main_serial(mesh_file,
+    force_file,output_path,Δt,tf,Δtout)
+end
 end
