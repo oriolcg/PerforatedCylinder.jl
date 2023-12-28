@@ -49,12 +49,12 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
 
   # Physics parameters
   to_logfile("Parameters")
-  rho = 1.025e3 # kg/m^3
+  rho = 1.0e3#1.025e3 # kg/m^3
   Vinf = 1 # m/s
-  D = 10 # m
+  # D = 10 # m
   # Re = 1.0e6 #0
   H = 24 # m
-  μ_f = 1.0e-3# rho * Vinf * D / Re #0.01 # Fluid viscosity
+  μ_f = 1.0#1.0e-3# rho * Vinf * D / Re #0.01 # Fluid viscosity
   ν_f = μ_f / rho # kinematic viscosity
 
   # Boundary conditions and external loads
@@ -147,10 +147,14 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
     CellField(lazy_map(dx->dx^(1/2),get_cell_measure(trian)),trian)
   end
   h = DistributedCellField(hmap,Ω_f)
-  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
-  τₘ(u) = 1/τₘ⁻¹(u)
+  abs_(u) = (u⋅u).^(1/2) .+ 1e-14
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*(abs_(u))/h)
+  τₘ(u) = 1.0 / τₘ⁻¹(u)
   τc(u) = cc *(h2/(c₁*τₘ(u)))
-  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./(u⋅u).^(1/2))
+
+  dabs_(u,du) = (1/abs_(u))*(u⋅du)
+  dτₘ⁻¹(u,du) = c₂/h*dabs_(u,du)
+  dτₘ(u,du) = -1/(τₘ⁻¹(u)*τₘ⁻¹(u)) * dτₘ⁻¹(u,du)
   dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
 
 
@@ -189,7 +193,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
   ode_solver₁ = ThetaMethod(nls,Δt,1.0)
-  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
+  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_Midpoint_1_2()))
+  # ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
 
   xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
   function get_step(xₜ)

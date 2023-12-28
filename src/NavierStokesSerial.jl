@@ -41,7 +41,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   # Physics parameters
   to_logfile("Parameters")
-  rho = 1.025e3 # kg/m^3
+  rho = 1.0e3#1.025e3 # kg/m^3
   Vinf = 1 # m/s
   μ_f = 1.0e0# rho * Vinf * D / Re #0.01 # Fluid viscosity
   ν_f = μ_f / rho # kinematic viscosity

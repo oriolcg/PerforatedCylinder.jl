@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="cnn-NS"
 #SBATCH --partition=compute
-#SBATCH --time=02:00:00
+#SBATCH --time=04:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1

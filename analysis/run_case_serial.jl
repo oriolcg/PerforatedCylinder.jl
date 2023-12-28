@@ -5,9 +5,6 @@ using PerforatedCylinder
 const project_root = joinpath(@__DIR__,"..")
 const data_dir = project_root * "/data"
 const OVERWRITE = true
-ENV["PerforatedCylinder_VTKs"] = data_dir * "/VTKs/"
-ENV["PerforatedCylinder_FORCES"] = data_dir * "/forces/"
-ENV["PerforatedCylinder_MESHES"] = data_dir * "/meshes/"
 
 # Define cases
 nbeta = 21
@@ -16,7 +13,7 @@ nperfs = 40
 perf_cases = 3:30
 porosities = 0.3:0.02:0.7
 alphas = [0.0]#:15.0/(nalpha-1):15.0
-cases = ["tmp_coarse"]
+cases = []#["tmp_coarse"]
 for num_perforations in perf_cases
   for β in porosities
     for α in alphas
@@ -28,7 +25,8 @@ for num_perforations in perf_cases
 end
 
 # Set filenames
-for testname in cases[1:10]
+# for testname in cases[1:10]
+  testname = cases[parse(Int,ENV["CASE_ID"])]
   mesh_file = testname * ".msh"
   force_file = testname * ".csv"
   vtks_path = ENV["PerforatedCylinder_VTKs"]
@@ -51,10 +49,14 @@ for testname in cases[1:10]
     Δtout = 0.0
   else
     Δt = 0.05
-    tf = 10.0
+    tf = 1.0
     Δtout = 0.0
   end
-  PerforatedCylinder.main_serial(mesh_file,
-    force_file,output_path,Δt,tf,Δtout)
-end
+  PerforatedCylinder.main_serial(mesh_file=mesh_file,
+    force_file=force_file,
+    output_path=output_path,
+    Δt=Δt,
+    tf=tf,
+    Δtout=Δtout)
+# end
 end

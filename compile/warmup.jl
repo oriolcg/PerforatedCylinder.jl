@@ -1,6 +1,6 @@
 using PerforatedCylinder
 # PerforatedCylinder.main_serial()
-PerforatedCylinder.generate_meshes()
+# PerforatedCylinder.generate_meshes()
 PerforatedCylinder.main_parallel(1)
 
 # testname = "3D_monopile_coarse"

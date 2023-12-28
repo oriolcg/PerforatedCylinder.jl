@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="compile_PerforatedCylinder"
 #SBATCH -p thin
-#SBATCH -t 01:00:00
+#SBATCH -t 04:00:00
 #SBATCH -n 1
 #SBATCH -o stdout
 #SBATCH -e stderr

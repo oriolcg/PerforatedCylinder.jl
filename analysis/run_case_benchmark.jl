@@ -12,7 +12,7 @@ const OVERWRITE = true
 nbeta = 21
 nalpha = 1
 nperfs = 40
-perf_cases = 3:30
+perf_cases = 3:30#[3,9,27]
 porosities = 0.3:0.02:0.7
 alphas = [0.0]#:15.0/(nalpha-1):15.0
 cases = []
@@ -33,7 +33,7 @@ testname = cases[case_id]
 mesh_file = testname * ".msh"
 force_file = testname * ".csv"
 vtks_path = ENV["PerforatedCylinder_VTKs"]
-output_path = joinpath(vtks_path,"results_"*testname)
+output_path = joinpath(vtks_path,"results_"*testname*"-$np")
 if isdir(output_path)
   if MPI.Comm_rank(comm)==0
     println("Existing case. Exiting execution without computing.")
@@ -57,9 +57,9 @@ PerforatedCylinder.main_parallel(np;
   mesh_file=mesh_file,
   force_file=force_file,
   output_path=output_path,
-  Δt=0.1,
-  tf=50,
-  Δtout=0.0,
+  Δt=0.01,
+  tf=2.0,
+  Δtout=0.05,
 )
 
 MPI.Finalize()

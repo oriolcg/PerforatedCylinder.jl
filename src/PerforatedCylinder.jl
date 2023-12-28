@@ -100,9 +100,9 @@ options_fieldsplit = "-snes_type newtonls \
 options_mumps = "-snes_type newtonls \
 -snes_linesearch_type basic  \
 -snes_linesearch_damping 1.0 \
--snes_rtol 1.0e-8 \
--snes_atol 1.0e-10 \
--snes_max_it 10 \
+-snes_rtol 1.0e-6 \
+-snes_atol 1.0e-8 \
+-snes_max_it 20 \
 -ksp_error_if_not_converged true \
 -ksp_converged_reason -ksp_type preonly \
 -pc_type lu \
@@ -130,7 +130,7 @@ function main_parallel(np;
   cd(current_path)
 end
 
-function main_serial(mesh_file="tmp_coarse.msh",
+function main_serial(;mesh_file="tmp_coarse.msh",
   force_file="forces.csv",
   output_path="tmp",
   Δt=0.5,
