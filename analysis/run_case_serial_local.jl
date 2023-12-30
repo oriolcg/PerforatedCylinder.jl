@@ -13,8 +13,8 @@ ENV["PerforatedCylinder_VTKs"] = data_dir * "/VTKs"
 nbeta = 21
 nalpha = 1
 nperfs = 40
-perf_cases = 3:30
-porosities = 0.3:0.02:0.7
+perf_cases = [8]#3:30
+porosities = [0.3]#0.3:0.02:0.7
 alphas = [0.0]#:15.0/(nalpha-1):15.0
 cases = ["tmp_coarse"]
 for num_perforations in perf_cases
@@ -52,7 +52,7 @@ for testname in cases[1:2]
     Δtout = 0.0
   else
     Δt = 0.05
-    tf = 1.0
+    tf = 15.0
     Δtout = 0.0
   end
   PerforatedCylinder.main_serial(mesh_file=mesh_file,
