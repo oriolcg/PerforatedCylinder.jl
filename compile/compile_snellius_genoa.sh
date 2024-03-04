@@ -4,8 +4,8 @@
 #SBATCH -p genoa
 #SBATCH -t 04:00:00
 #SBATCH -n 1
-#SBATCH -o stdout
-#SBATCH -e stderr
+#SBATCH -o stdout_genoa
+#SBATCH -e stderr_genoa
 
 source modules_snellius.sh
 julia --project=../ -e 'using Pkg; Pkg.build("MPI")'
