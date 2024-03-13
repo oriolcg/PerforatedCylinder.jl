@@ -16,7 +16,8 @@ using SparseMatricesCSR
 using CSV
 using DataFrames
 
-include("NavierStokesSerial.jl")
+# include("NavierStokesSerial.jl")
+include("NavierStokesSerial_coupled.jl")
 include("NavierStokesParallel.jl")
 include("mesh_generation.jl")
 
