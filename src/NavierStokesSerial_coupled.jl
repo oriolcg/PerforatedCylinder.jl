@@ -138,20 +138,26 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
   neg(a) = min(a,0.0)
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = ∫( c(u,u,v) + ε(v) ⊙ (σ_dev_f ∘ ε(u)) - p*(∇⋅v) + (∇⋅u)*q +
-                          τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) + τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+  res(t,(u,p,η),(v,q,κ)) = ∫( c(u,u,v) )dΩ_f +
+                          ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ_f -
+                          ∫( p*(∇⋅v) )dΩ_f +
+                          ∫( (∇⋅u)*q )dΩ_f +
+                          ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+                          ∫( τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
                        ∫( (u⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout
-  jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) = ∫( c(du,u,v) )dΩ_f +
-  ∫( c(u,du,v) )dΩ_f +
-  ∫( ε(v) ⊙ (σ_dev_f ∘ ε(du)) )dΩ_f -
-  ∫( dp*(∇⋅v) )dΩ_f +
-  ∫( (∇⋅du)*q )dΩ_f +
-  ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅du) + (∇(du)'⋅u + ∇(u)'⋅du - dη)⋅(∇(v)'⋅u-κ)) )dΩ_f +
-  ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
-  ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
-  ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
-                               ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) +
-                                  (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
+  jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
+    ∫( c(du,u,v) )dΩ_f +
+    ∫( c(u,du,v) )dΩ_f +
+    ∫( ε(v) ⊙ (σ_dev_f ∘ ε(du)) )dΩ_f -
+    ∫( dp*(∇⋅v) )dΩ_f +
+    ∫( (∇⋅du)*q )dΩ_f +
+    ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅du)) )dΩ_f +
+    ∫( τₘ(u)*((∇(du)'⋅u + ∇(u)'⋅du - dη)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+    ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
+    ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+    ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+    ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
+    ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
   jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
