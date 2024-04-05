@@ -13,6 +13,7 @@ using GridapPETSc: PETSC
 using PartitionedArrays
 using SparseMatricesCSR
 using LineSearches: Static, BackTracking
+using GridapSolvers
 
 using CSV
 using DataFrames

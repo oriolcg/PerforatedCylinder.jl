@@ -135,43 +135,26 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # end
 
   # Weak form
-
-  conv(a,∇u) = (∇u'⋅a)
-  ℒ(a,∇u,∇p) = ∇u'⋅a + ∇p
-  ∂ℒ(da,∇u) = ∇u'⋅da
-  𝒫(a,∇u,∇p,η) = ℒ(a,∇u,∇p)-η
-  ∂𝒫(a,∇u) = ∂ℒ(a,∇u)
+  c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
   neg(a) = min(a,0.0)
-  uₛ(a,∇u,∇p,η) = τₘ(a)*𝒫(a,∇u,∇p,η)
-  ∂uₛ(a,∇u,∇p,η,da,∇du,∇dp,dη) = dτₘ(a,da)*𝒫(a,∇u,∇p,η) + τₘ(a)*(𝒫(a,∇du,∇dp,dη)+∂𝒫(da,∇u))
-
-  c(a,u,v,dΩ) = ∫(0.5*((conv∘(a,∇(u)))⋅v - u⋅(conv∘(a,∇(v)))))dΩ
-  lap(u,v,dΩ) = ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ
-  div(u,q,dΩ) = ∫( q*(∇⋅u) )dΩ
-  stab(a,u,p,η,v,q,κ,dΩ) = ∫( uₛ(a,∇(u),∇(p),η)⋅𝒫(a,∇(v),∇(q),κ))dΩ
-  dstab(a,u,p,η,da,du,dp,dη,v,q,κ,dΩ) =
-    ∫( ∂uₛ(a,∇(u),∇(p),η,da,∇(du),∇(dp),dη)⋅𝒫(a,∇(v),∇(q),κ) )dΩ +
-    ∫( uₛ(a,∇(u),∇(p),η)⋅∂𝒫(da,∇(v)) )dΩ
-  graddiv(a,u,v,dΩ) = ∫( τc(a)*((∇⋅u)*(∇⋅v)) )dΩ
-  cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
-
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = c(u,u,v,dΩ_f) +
-                           lap(u,v,dΩ_f) -
-                           div(v,p,dΩ_f) +
-                           div(u,q,dΩ_f) +
-                           stab(u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(u,u,v,dΩ_f) +
-                           cΓ(u,u,v,n_Γout,dΓout)
+  res(t,(u,p,η),(v,q,κ)) = ∫( c(u,u,v) )dΩ_f +
+                          ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ_f -
+                          ∫( p*(∇⋅v) )dΩ_f +
+                          ∫( (∇⋅u)*q )dΩ_f +
+                          ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+                          ∫( τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+                       ∫( (u⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout
   jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
-    c(du,u,v,dΩ_f) +
-    c(u,du,v,dΩ_f) +
-    lap(du,v,dΩ_f) -
-    div(v,dp,dΩ_f) +
-    div(du,q,dΩ_f) +
-    dstab(u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
+    ∫( c(du,u,v) )dΩ_f +
+    ∫( c(u,du,v) )dΩ_f +
+    ∫( ε(v) ⊙ (σ_dev_f ∘ ε(du)) )dΩ_f -
+    ∫( dp*(∇⋅v) )dΩ_f +
+    ∫( (∇⋅du)*q )dΩ_f +
+    ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅du)) )dΩ_f +
+    ∫( τₘ(u)*((∇(du)'⋅u + ∇(u)'⋅du - dη)⋅(∇(v)'⋅u-κ)) )dΩ_f +
     ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
-    # ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+    ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
     ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
@@ -213,7 +196,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       # uₙₕ = interpolate!(uh,fv_u,U(t))
       # ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(uh,∇(uh),∇(ph),ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ],order=2)
         tout=t+Δtout
       end
     end
