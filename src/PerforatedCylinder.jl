@@ -21,6 +21,7 @@ using DataFrames
 include("NavierStokesSerial_coupled.jl")
 include("NavierStokesParallel.jl")
 include("mesh_generation.jl")
+include("mesh_generation_length.jl")
 
 function generate_meshes(nperf=1,nβ=1,nα=1)
   # Create cases

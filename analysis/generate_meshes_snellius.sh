@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name="generate_meshes"
-#SBATCH -p thin
+#SBATCH -p genoa
 #SBATCH -t 01:00:00
 #SBATCH -n 1
 #SBATCH -o stdout/generate_meshes.out
@@ -9,4 +9,5 @@
 
 source ../compile/modules_snellius.sh
 # mpiexecjl --project=../ -n 1 julia -J ../PerforatedCylinder_parallel.so -O3 --check-bounds=no --color=yes -e 'include("generate_meshes.jl")'
-julia --project=../ -J ../PerforatedCylinder_parallel.so -O3 --check-bounds=no --color=yes -e 'include("generate_meshes.jl")'
+# julia --project=../ -J ../PerforatedCylinder_parallel_genoa.so -O3 --check-bounds=no --color=yes -e 'include("generate_meshes_length.jl")'
+julia --project=../ -O3 --check-bounds=no --color=yes -e 'include("generate_meshes_length.jl")'
