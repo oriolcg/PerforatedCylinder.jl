@@ -13,7 +13,9 @@ using GridapPETSc: PETSC
 using PartitionedArrays
 using SparseMatricesCSR
 using LineSearches: Static, BackTracking
-using GridapSolvers
+# using GridapSolvers
+# using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers
+# using GridapSolvers.BlockSolvers: NonlinearSystemBlock, BlockTriangularSolver
 
 using CSV
 using DataFrames

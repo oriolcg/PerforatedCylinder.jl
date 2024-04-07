@@ -74,15 +74,17 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
   Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Κ = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
-  Y = MultiFieldFESpace([V, Q, Κ])
-  Y₀ = MultiFieldFESpace([V, Q])
 
   # Define trial FESpaces from Dirichlet values
   U = TransientTrialFESpace(V, U0_dirichlet)
   P = TrialFESpace(Q)
   Η = TrialFESpace(Κ,[VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
-  X = TransientMultiFieldFESpace([U, P,Η])
+
+  mfs = Gridap.MultiField.BlockMultiFieldStyle(2,(1,2))
+  X = TransientMultiFieldFESpace([Η, U, P];style=mfs)
+  Y = MultiFieldFESpace([Κ, V, Q];style=mfs)
   X₀ = MultiFieldFESpace([U(0.0), P])
+  Y₀ = MultiFieldFESpace([V, Q])
 
   # Stokes for pre-initalize NS
   σ_dev_f(ε) = 2 * ν_f * ε #  Cauchy stress tensor for the fluid
@@ -97,8 +99,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   # initial condition NS
   to_logfile("Navier-Stokes operator")
-  xh₀ = interpolate_everywhere([u_ST, p_ST, VectorValue(0.0,0.0)],X(0.0))
-  vh₀ = interpolate_everywhere((u0(0),0.0,VectorValue(0.0,0.0)),X(0.0))
+  xh₀ = interpolate_everywhere([VectorValue(0.0,0.0),u_ST, p_ST],X(0.0))
+  vh₀ = interpolate_everywhere((VectorValue(0.0,0.0),u0(0),0.0),X(0.0))
 
   # Explicit FE functions
   # global ηₙₕ = interpolate(u0(0),U(0.0))
@@ -155,15 +157,15 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   graddiv(a,u,v,dΩ) = ∫( τc(a)*((∇⋅u)*(∇⋅v)) )dΩ
   cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
 
-  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = c(u,u,v,dΩ_f) +
+  mass(t,(_,∂ₜu,),(_,v,)) = ∫( ∂ₜu⋅v )dΩ_f
+  res(t,(η,u,p),(κ,v,q)) = c(u,u,v,dΩ_f) +
                            lap(u,v,dΩ_f) -
                            div(v,p,dΩ_f) +
                            div(u,q,dΩ_f) +
                            stab(u,u,p,η,v,q,κ,dΩ_f) +
                            graddiv(u,u,v,dΩ_f) +
                            cΓ(u,u,v,n_Γout,dΓout)
-  jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
+  jac(t,(η,u,p),(dη,du,dp),(κ,v,q)) =
     c(du,u,v,dΩ_f) +
     c(u,du,v,dΩ_f) +
     lap(du,v,dΩ_f) -
@@ -175,15 +177,26 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
     ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
-  jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
+  jac_t(t,_,(_,dut,),(_,v,)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
   # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
+  # Block solver
+  solver_η = LUSolver()
+  solver_up = LUSolver()
+  bblocks = [NonlinearSystemBlock() NonlinearSystemBlock();
+             NonlinearSystemBlock() NonlinearSystemBlock()]
+  coeffs = [1.0 1.0; 0.0 1.0]
+  Prec = BlockTriangularSolver(bblocks,[solver_η,solver_up],coeffs,:upper)
+  bsolver = FGMRESSolver(20,Prec;atol=1e-14,rtol=1.e-8,verbose=false)
+  bsolver.log.depth = 1
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6, linesearch=BackTracking())
+  # nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6, linesearch=BackTracking())
+  nls = NewtonSolver(bsolver;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=true)
+  nls.log.depth = 1
   ls_mass = LUSolver()
 
   # ODE solvers:
@@ -206,7 +219,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   println("Postprocess")
   global tout = 0
   createpvd("NS_test") do pvd
-    for (t,(uh,ph,ηₕ)) in xₜ
+    for (t,(ηₕ,uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
       Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
