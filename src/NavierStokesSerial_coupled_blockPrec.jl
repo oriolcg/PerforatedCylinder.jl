@@ -1,4 +1,4 @@
-function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
+function run_test_serial_bp(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   io = open("output.log", "w")
   forces_path=ENV["PerforatedCylinder_FORCES"]
