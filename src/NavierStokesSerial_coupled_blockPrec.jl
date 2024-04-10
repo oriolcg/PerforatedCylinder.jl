@@ -1,4 +1,4 @@
-function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
+function run_test_serial_bp(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   io = open("output.log", "w")
   forces_path=ENV["PerforatedCylinder_FORCES"]
@@ -74,15 +74,17 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
   Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Κ = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
-  Y = MultiFieldFESpace([V, Q, Κ])
-  Y₀ = MultiFieldFESpace([V, Q])
 
   # Define trial FESpaces from Dirichlet values
   U = TransientTrialFESpace(V, U0_dirichlet)
   P = TrialFESpace(Q)
   Η = TrialFESpace(Κ,[VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
-  X = TransientMultiFieldFESpace([U, P,Η])
+
+  mfs = Gridap.MultiField.BlockMultiFieldStyle(2,(1,2))
+  X = TransientMultiFieldFESpace([Η, U, P];style=mfs)
+  Y = MultiFieldFESpace([Κ, V, Q];style=mfs)
   X₀ = MultiFieldFESpace([U(0.0), P])
+  Y₀ = MultiFieldFESpace([V, Q])
 
   # Stokes for pre-initalize NS
   σ_dev_f(ε) = 2 * ν_f * ε #  Cauchy stress tensor for the fluid
@@ -97,8 +99,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
   # initial condition NS
   to_logfile("Navier-Stokes operator")
-  xh₀ = interpolate_everywhere([u_ST, p_ST, VectorValue(0.0,0.0)],X(0.0))
-  vh₀ = interpolate_everywhere((u0(0),0.0,VectorValue(0.0,0.0)),X(0.0))
+  xh₀ = interpolate_everywhere([VectorValue(0.0,0.0),u_ST, p_ST],X(0.0))
+  vh₀ = interpolate_everywhere((VectorValue(0.0,0.0),u0(0),0.0),X(0.0))
 
   # Explicit FE functions
   # global ηₙₕ = interpolate(u0(0),U(0.0))
@@ -111,12 +113,10 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   cc = 4.0
   h = CellField(get_cell_measure(Ω_f),Ω_f)
   h2 = CellField(lazy_map(dx->dx^(1/2),get_cell_measure(Ω_f)),Ω_f)
-  abs_(u) = (u⋅u)^(1/2)+1.0e-14
-  dabs_(u,du) = (u⋅du)/abs_(u)
-  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*(abs_∘u)/h)
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
   τₘ(u) = 1/τₘ⁻¹(u)
   τc(u) = cc *(h2/(c₁*τₘ(u)))
-  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(dabs_∘(u,du)))
+  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./((u⋅u).^(1/2)+1.0e-14))
   dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
 
   # Orthogonal projection
@@ -139,33 +139,33 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # Weak form
 
   conv(a,∇u) = (∇u'⋅a)
-  ℒ(a,u,p) = (conv∘(a,∇(u))) + ∇(p)
-  ∂ₐℒ(da,u) = conv∘(da,∇(u))
-  𝒫(a,u,p,η) = ℒ(a,u,p)-η
-  ∂ₐ𝒫(da,u) = ∂ₐℒ(da,u)
+  ℒ(a,∇u,∇p) = ∇u'⋅a + ∇p
+  ∂ℒ(da,∇u) = ∇u'⋅da
+  𝒫(a,∇u,∇p,η) = ℒ(a,∇u,∇p)-η
+  ∂𝒫(a,∇u) = ∂ℒ(a,∇u)
   neg(a) = min(a,0.0)
-  uₛ(a,u,p,η) = τₘ(a)*𝒫(a,u,p,η)
-  ∂uₛ(a,u,p,η,da,du,dp,dη) = dτₘ(a,da)*𝒫(a,u,p,η) + τₘ(a)*(𝒫(a,du,dp,dη)+∂ₐ𝒫(da,u))
+  uₛ(a,∇u,∇p,η) = τₘ(a)*𝒫(a,∇u,∇p,η)
+  ∂uₛ(a,∇u,∇p,η,da,∇du,∇dp,dη) = dτₘ(a,da)*𝒫(a,∇u,∇p,η) + τₘ(a)*(𝒫(a,∇du,∇dp,dη)+∂𝒫(da,∇u))
 
   c(a,u,v,dΩ) = ∫(0.5*((conv∘(a,∇(u)))⋅v - u⋅(conv∘(a,∇(v)))))dΩ
   lap(u,v,dΩ) = ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ
   div(u,q,dΩ) = ∫( q*(∇⋅u) )dΩ
-  stab(a,u,p,η,v,q,κ,dΩ) = ∫( uₛ(a,u,p,η)⋅𝒫(a,v,q,κ))dΩ
+  stab(a,u,p,η,v,q,κ,dΩ) = ∫( uₛ(a,∇(u),∇(p),η)⋅𝒫(a,∇(v),∇(q),κ))dΩ
   dstab(a,u,p,η,da,du,dp,dη,v,q,κ,dΩ) =
-    ∫( ∂uₛ(a,u,p,η,da,du,dp,dη)⋅𝒫(a,v,q,κ) )dΩ +
-    ∫( uₛ(a,u,p,η)⋅∂ₐ𝒫(da,v) )dΩ
+    ∫( ∂uₛ(a,∇(u),∇(p),η,da,∇(du),∇(dp),dη)⋅𝒫(a,∇(v),∇(q),κ) )dΩ +
+    ∫( uₛ(a,∇(u),∇(p),η)⋅∂𝒫(da,∇(v)) )dΩ
   graddiv(a,u,v,dΩ) = ∫( τc(a)*((∇⋅u)*(∇⋅v)) )dΩ
   cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
 
-  mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = c(u,u,v,dΩ_f) +
+  mass(t,(_,∂ₜu,),(_,v,)) = ∫( ∂ₜu⋅v )dΩ_f
+  res(t,(η,u,p),(κ,v,q)) = c(u,u,v,dΩ_f) +
                            lap(u,v,dΩ_f) -
                            div(v,p,dΩ_f) +
                            div(u,q,dΩ_f) +
                            stab(u,u,p,η,v,q,κ,dΩ_f) +
                            graddiv(u,u,v,dΩ_f) +
                            cΓ(u,u,v,n_Γout,dΓout)
-  jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
+  jac(t,(η,u,p),(dη,du,dp),(κ,v,q)) =
     c(du,u,v,dΩ_f) +
     c(u,du,v,dΩ_f) +
     lap(du,v,dΩ_f) -
@@ -173,18 +173,30 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
     div(du,q,dΩ_f) +
     dstab(u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
     ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
+    # ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
     ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
-  jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
+  jac_t(t,_,(_,dut,),(_,v,)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
   # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
 
+  # Block solver
+  solver_η = LUSolver()
+  solver_up = LUSolver()
+  bblocks = [NonlinearSystemBlock() NonlinearSystemBlock();
+             NonlinearSystemBlock() NonlinearSystemBlock()]
+  coeffs = [1.0 1.0; 0.0 1.0]
+  Prec = BlockTriangularSolver(bblocks,[solver_η,solver_up],coeffs,:upper)
+  bsolver = FGMRESSolver(20,Prec;atol=1e-14,rtol=1.e-8,verbose=false)
+  bsolver.log.depth = 1
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6, linesearch=BackTracking())
+  # nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6, linesearch=BackTracking())
+  nls = NewtonSolver(bsolver;maxiter=20,atol=1e-14,rtol=1.e-6,verbose=true)
+  nls.log.depth = 1
   ls_mass = LUSolver()
 
   # ODE solvers:
@@ -207,7 +219,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   println("Postprocess")
   global tout = 0
   createpvd("NS_test") do pvd
-    for (t,(uh,ph,ηₕ)) in xₜ
+    for (t,(ηₕ,uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
       Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
@@ -215,7 +227,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       # uₙₕ = interpolate!(uh,fv_u,U(t))
       # ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(uh,uh,ph,ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(uh,∇(uh),∇(ph),ηₕ)],order=2)
         tout=t+Δtout
       end
     end

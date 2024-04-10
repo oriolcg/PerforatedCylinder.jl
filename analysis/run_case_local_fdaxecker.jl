@@ -15,6 +15,7 @@ ENV["PerforatedCylinder_VTKs"] = output_dir
 
 const to = TimerOutput()
 
+println("COARSE")
 @timeit to "coarse" begin
 # Run case
 PerforatedCylinder.main_serial(
@@ -26,29 +27,99 @@ PerforatedCylinder.main_serial(
   Δtout=0.05
 )
 end
+println("COARSE 2")
+@timeit to "coarse2" begin
+  # Run case
+  PerforatedCylinder.main_serial(
+    mesh_file="tmp_coarse.msh",
+    force_file="tmp_coarse.csv",
+    output_path=output_dir,
+    Δt=0.05,
+    tf=0.05,
+    Δtout=0.05
+  )
+end
+# println("COARSE BP")
+# @timeit to "coarse_bp" begin
+#   # Run case
+#   PerforatedCylinder.main_serial_bp(
+#     mesh_file="tmp_coarse.msh",
+#     force_file="tmp_coarse.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.05,
+#     Δtout=0.05
+#   )
+#   end
 
-@timeit to "fine" begin
+# println("COARSE BP 2")
+#   @timeit to "coarse_bp2" begin
+#     # Run case
+#     PerforatedCylinder.main_serial_bp(
+#       mesh_file="tmp_coarse.msh",
+#       force_file="tmp_coarse.csv",
+#       output_path=output_dir,
+#       Δt=0.05,
+#       tf=0.05,
+#       Δtout=0.05
+#     )
+#   end
+@timeit to "coarse_long" begin
   # Run case
   PerforatedCylinder.main_serial(
-    mesh_file="H=2.0-3-0.3-30.0.msh",
-    force_file="H=2.0-3-0.3-30.0.csv",
+    mesh_file="tmp_coarse.msh",
+    force_file="tmp_coarse.csv",
     output_path=output_dir,
     Δt=0.05,
-    tf=0.01,
+    tf=0.5,
     Δtout=0.05
   )
-end
-@timeit to "fine long" begin
-  # Run case
-  PerforatedCylinder.main_serial(
-    mesh_file="H=2.0-3-0.3-30.0.msh",
-    force_file="H=2.0-3-0.3-30.0.csv",
-    output_path=output_dir,
-    Δt=0.05,
-    tf=0.02,
-    Δtout=0.05
-  )
-end
+  end
+
+# @timeit to "fine" begin
+#   # Run case
+#   PerforatedCylinder.main_serial(
+#     mesh_file="H=2.0-3-0.3-30.0.msh",
+#     force_file="H=2.0-3-0.3-30.0.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.01,
+#     Δtout=0.05
+#   )
+# end
+# @timeit to "fine_bp" begin
+#   # Run case
+#   PerforatedCylinder.main_serial_bp(
+#     mesh_file="H=2.0-3-0.3-30.0.msh",
+#     force_file="H=2.0-3-0.3-30.0.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.01,
+#     Δtout=0.05
+#   )
+# end
+# @timeit to "fine long" begin
+#   # Run case
+#   PerforatedCylinder.main_serial(
+#     mesh_file="H=2.0-3-0.3-30.0.msh",
+#     force_file="H=2.0-3-0.3-30.0.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.5,
+#     Δtout=0.05
+#   )
+# end
+# @timeit to "fine long bp" begin
+#   # Run case
+#   PerforatedCylinder.main_serial_bp(
+#     mesh_file="H=2.0-3-0.3-30.0.msh",
+#     force_file="H=2.0-3-0.3-30.0.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.5,
+#     Δtout=0.05
+#   )
+# end
 
 show(to)
 # for mesh_file_i in mesh_dir:
@@ -60,4 +131,5 @@ show(to)
 #   tf=30,
 #   Δtout=0.1
 # )
+
 end

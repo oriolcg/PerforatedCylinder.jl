@@ -111,12 +111,10 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   cc = 4.0
   h = CellField(get_cell_measure(Ω_f),Ω_f)
   h2 = CellField(lazy_map(dx->dx^(1/2),get_cell_measure(Ω_f)),Ω_f)
-  abs_(u) = (u⋅u)^(1/2)+1.0e-14
-  dabs_(u,du) = (u⋅du)/abs_(u)
-  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*(abs_∘u)/h)
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*((u⋅u).^(1/2))/h)
   τₘ(u) = 1/τₘ⁻¹(u)
   τc(u) = cc *(h2/(c₁*τₘ(u)))
-  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(dabs_∘(u,du)))
+  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(u⋅du)./((u⋅u).^(1/2)+1.0e-14))
   dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
 
   # Orthogonal projection
@@ -137,42 +135,26 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # end
 
   # Weak form
-
-  conv(a,∇u) = (∇u'⋅a)
-  ℒ(a,u,p) = (conv∘(a,∇(u))) + ∇(p)
-  ∂ₐℒ(da,u) = conv∘(da,∇(u))
-  𝒫(a,u,p,η) = ℒ(a,u,p)-η
-  ∂ₐ𝒫(da,u) = ∂ₐℒ(da,u)
+  c(a,u,v) = 0.5*((∇(u)'⋅a)⋅v - u⋅(∇(v)'⋅a))
   neg(a) = min(a,0.0)
-  uₛ(a,u,p,η) = τₘ(a)*𝒫(a,u,p,η)
-  ∂uₛ(a,u,p,η,da,du,dp,dη) = dτₘ(a,da)*𝒫(a,u,p,η) + τₘ(a)*(𝒫(a,du,dp,dη)+∂ₐ𝒫(da,u))
-
-  c(a,u,v,dΩ) = ∫(0.5*((conv∘(a,∇(u)))⋅v - u⋅(conv∘(a,∇(v)))))dΩ
-  lap(u,v,dΩ) = ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ
-  div(u,q,dΩ) = ∫( q*(∇⋅u) )dΩ
-  stab(a,u,p,η,v,q,κ,dΩ) = ∫( uₛ(a,u,p,η)⋅𝒫(a,v,q,κ))dΩ
-  dstab(a,u,p,η,da,du,dp,dη,v,q,κ,dΩ) =
-    ∫( ∂uₛ(a,u,p,η,da,du,dp,dη)⋅𝒫(a,v,q,κ) )dΩ +
-    ∫( uₛ(a,u,p,η)⋅∂ₐ𝒫(da,v) )dΩ
-  graddiv(a,u,v,dΩ) = ∫( τc(a)*((∇⋅u)*(∇⋅v)) )dΩ
-  cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
-
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = c(u,u,v,dΩ_f) +
-                           lap(u,v,dΩ_f) -
-                           div(v,p,dΩ_f) +
-                           div(u,q,dΩ_f) +
-                           stab(u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(u,u,v,dΩ_f) +
-                           cΓ(u,u,v,n_Γout,dΓout)
+  res(t,(u,p,η),(v,q,κ)) = ∫( c(u,u,v) )dΩ_f +
+                          ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ_f -
+                          ∫( p*(∇⋅v) )dΩ_f +
+                          ∫( (∇⋅u)*q )dΩ_f +
+                          ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
+                          ∫( τc(u)*((∇⋅u)*(∇⋅v)) )dΩ_f +
+                       ∫( (u⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout
   jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
-    c(du,u,v,dΩ_f) +
-    c(u,du,v,dΩ_f) +
-    lap(du,v,dΩ_f) -
-    div(v,dp,dΩ_f) +
-    div(du,q,dΩ_f) +
-    dstab(u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
+    ∫( c(du,u,v) )dΩ_f +
+    ∫( c(u,du,v) )dΩ_f +
+    ∫( ε(v) ⊙ (σ_dev_f ∘ ε(du)) )dΩ_f -
+    ∫( dp*(∇⋅v) )dΩ_f +
+    ∫( (∇⋅du)*q )dΩ_f +
+    ∫( τₘ(u)*((∇(u)'⋅u - η)⋅(∇(v)'⋅du)) )dΩ_f +
+    ∫( τₘ(u)*((∇(du)'⋅u + ∇(u)'⋅du - dη)⋅(∇(v)'⋅u-κ)) )dΩ_f +
     ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
+    ∫( dτₘ(u,du)*((∇(u)'⋅u - η)⋅(∇(v)'⋅u-κ)) )dΩ_f +
     ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
@@ -181,7 +163,6 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # NS operator
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
   # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
-
 
   # Nonlinear Solver
   nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6, linesearch=BackTracking())
@@ -215,7 +196,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       # uₙₕ = interpolate!(uh,fv_u,U(t))
       # ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(uh,uh,ph,ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ],order=2)
         tout=t+Δtout
       end
     end

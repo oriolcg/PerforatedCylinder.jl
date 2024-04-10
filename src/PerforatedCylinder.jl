@@ -13,14 +13,19 @@ using GridapPETSc: PETSC
 using PartitionedArrays
 using SparseMatricesCSR
 using LineSearches: Static, BackTracking
+# using GridapSolvers
+# using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers
+# using GridapSolvers.BlockSolvers: NonlinearSystemBlock, BlockTriangularSolver
 
 using CSV
 using DataFrames
 
 # include("NavierStokesSerial.jl")
 include("NavierStokesSerial_coupled.jl")
+# include("NavierStokesSerial_coupled_blockPrec.jl")
 include("NavierStokesParallel.jl")
 include("mesh_generation.jl")
+include("mesh_generation_length.jl")
 
 function generate_meshes(nperf=1,nβ=1,nα=1)
   # Create cases
@@ -142,6 +147,19 @@ function main_serial(;mesh_file="tmp_coarse.msh",
   current_path = pwd()
   cd(output_path)
   run_test_serial(mesh_file,force_file,Δt,tf,Δtout)
+  cd(current_path)
+end
+
+function main_serial_bp(;mesh_file="tmp_coarse.msh",
+  force_file="forces.csv",
+  output_path="tmp",
+  Δt=0.5,
+  tf=1.0,
+  Δtout=0.5)
+  println("Running serial test: $(mesh_file), $(force_file), $Δt, $tf, $Δtout")
+  current_path = pwd()
+  cd(output_path)
+  run_test_serial_bp(mesh_file,force_file,Δt,tf,Δtout)
   cd(current_path)
 end
 
