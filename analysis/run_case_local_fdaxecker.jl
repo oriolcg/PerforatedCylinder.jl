@@ -1,6 +1,7 @@
 module Local_run
 using PerforatedCylinder
 using TimerOutputs
+using ProfileView
 
 # Paths
 const project_root = joinpath(@__DIR__,"..")
@@ -30,7 +31,7 @@ end
 println("COARSE 2")
 @timeit to "coarse2" begin
   # Run case
-  PerforatedCylinder.main_serial(
+  @profview PerforatedCylinder.main_serial(
     mesh_file="tmp_coarse.msh",
     force_file="tmp_coarse.csv",
     output_path=output_dir,
@@ -64,17 +65,17 @@ end
 #       Δtout=0.05
 #     )
 #   end
-@timeit to "coarse_long" begin
-  # Run case
-  PerforatedCylinder.main_serial(
-    mesh_file="tmp_coarse.msh",
-    force_file="tmp_coarse.csv",
-    output_path=output_dir,
-    Δt=0.05,
-    tf=0.5,
-    Δtout=0.05
-  )
-  end
+# @timeit to "coarse_long" begin
+#   # Run case
+#   PerforatedCylinder.main_serial(
+#     mesh_file="tmp_coarse.msh",
+#     force_file="tmp_coarse.csv",
+#     output_path=output_dir,
+#     Δt=0.05,
+#     tf=0.5,
+#     Δtout=0.05
+#   )
+#   end
 
 # @timeit to "fine" begin
 #   # Run case

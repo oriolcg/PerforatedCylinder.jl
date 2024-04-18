@@ -1,18 +1,24 @@
-function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
+function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δtout)
 
-  io = open("output.log", "w")
-  forces_path=ENV["PerforatedCylinder_FORCES"]
-  full_force_path = joinpath(forces_path,force_file)
-  io_force = open(full_force_path, "w")
+  if i_am_main(parts)
+    io = open("output.log", "w")
+    forces_path=ENV["PerforatedCylinder_FORCES"]
+    full_force_path = joinpath(forces_path,force_file)
+    io_force = open(full_force_path, "w")
+  end
   function to_logfile(x...)
-    write(io,join(x, " ")...)
-    write(io,"\n")
-    flush(io)
+    if i_am_main(parts)
+      write(io,join(x, " ")...)
+      write(io,"\n")
+      flush(io)
+    end
   end
   function to_forcefile(x...)
-    write(io_force,join(x, " ")...)
-    write(io_force,"\n")
-    flush(io_force)
+    if i_am_main(parts)
+      write(io_force,join(x, " ")...)
+      write(io_force,"\n")
+      flush(io_force)
+    end
   end
 
   # Geometry
@@ -23,7 +29,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   full_mesh_path = joinpath(meshes_path,mesh_file)
   to_logfile("Mesh file: ",full_mesh_path)
   testname = replace(mesh_file,".msh" =>"")
-  model =  GmshDiscreteModel(full_mesh_path)
+  model =  GmshDiscreteModel(parts,full_mesh_path)
   Ω = Triangulation(model)
   Ω_f = Triangulation(model, tags = "fluid")
   Γ_S = Boundary(model, tags = "monopile")
@@ -87,9 +93,29 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   l((v, q)) = ∫(0.0 * q)dΩ_f
   stokes_op = AffineFEOperator(a,l,X₀,Y₀)
 
+  # Setup solver via low level PETSC API calls
+  function mykspsetup(ksp)
+    pc       = Ref{GridapPETSc.PETSC.PC}()
+    mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
+    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
+    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
+    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
+    @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
+    @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  7, 0)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  24, 1)
+    # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
+    # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
+    @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-10)
+    @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
+  end
+
   # Linear Solver
   to_logfile("Stokes solve")
-  ls₀ = LUSolver()
+  ls₀ = PETScLinearSolver(mykspsetup)
   u_ST, p_ST = solve(ls₀,stokes_op)
 
   # initial condition NS
@@ -125,8 +151,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=false,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
-  ls_mass = LUSolver()
+  nls = PETScNonlinearSolver()
+  ls_mass = PETScLinearSolver(mykspsetup)
 
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
@@ -143,9 +169,11 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁)
 
   # Postprocess
-  println("Postprocess")
+  if i_am_main(parts)
+    println("Postprocess")
+  end
   global tout = 0
-  createpvd("NS_test") do pvd
+  createpvd(parts,"NS_test") do pvd
     for (t,(uh,ph,ηₕ)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
@@ -158,8 +186,10 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
     end
   end
 
-  close(io)
-  close(io_force)
+  if i_am_main(parts)
+    close(io)
+    close(io_force)
+  end
 
   return nothing
 end
