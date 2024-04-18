@@ -17,13 +17,19 @@ using LineSearches: Static, BackTracking
 # using GridapSolvers.LinearSolvers, GridapSolvers.NonlinearSolvers
 # using GridapSolvers.BlockSolvers: NonlinearSystemBlock, BlockTriangularSolver
 
+using Gridap.CellData: GenericField, Fill, DomainContribution, add_contribution!
+using Gridap.Fields: IntegrationMap, BroadcastingFieldOpMap
+using Gridap.Helpers: @notimplemented
+
 using CSV
 using DataFrames
 
 # include("NavierStokesSerial.jl")
+include("weak_form.jl")
 include("NavierStokesSerial_coupled.jl")
 # include("NavierStokesSerial_coupled_blockPrec.jl")
-include("NavierStokesParallel.jl")
+# include("NavierStokesParallel.jl")
+include("NavierStokesParallel_coupled.jl")
 include("mesh_generation.jl")
 include("mesh_generation_length.jl")
 

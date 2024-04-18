@@ -54,8 +54,18 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   u1(x,t,::Val{3}) = VectorValue( Vinf, 0.0, 0.0 )
   u0(x,t::Real) = u0(x,t,Val(dims))
   u1(x,t::Real) = u1(x,t,Val(dims))
+  # function u0(t::Real)
+  #   _u0(x) = u0(x,t,Val(dims))
+  #   return _u0
+  # end
+  # function u1(t::Real)
+  #   _u1(x) = u1(x,t,Val(dims))
+  #   return _u1
+  # end
   u0(t::Real) = x -> u0(x,t,Val(dims))
   u1(t::Real) = x -> u1(x,t,Val(dims))
+  # u0(t::Real) = VectorValue(0.0, 0.0)
+  # u1(t::Real) = VectorValue( Vinf, 0.0 )
   U0_dirichlet = [u1, u1, u0]
   g(x) = 0.0
 
@@ -83,7 +93,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   X₀ = MultiFieldFESpace([U(0.0), P])
 
   # Stokes for pre-initalize NS
-  a((u, p), (v, q)) = ∫( 2ν_f*(ε(v) ⊙ ε(u)) - (∇ ⋅ v) * p + q * (∇ ⋅ u))dΩ_f
+  σ_dev_f(ε) = 2 * ν_f * ε #  Cauchy stress tensor for the fluid
+  a((u, p), (v, q)) = ∫(ε(v) ⊙ (σ_dev_f ∘ ε(u)) - (∇ ⋅ v) * p + q * (∇ ⋅ u))dΩ_f
   l((v, q)) = ∫(0.0 * q)dΩ_f
   stokes_op = AffineFEOperator(a,l,X₀,Y₀)
 
@@ -95,43 +106,102 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # initial condition NS
   to_logfile("Navier-Stokes operator")
   xh₀ = interpolate_everywhere([u_ST, p_ST, VectorValue(0.0,0.0)],X(0.0))
+  vh₀ = interpolate_everywhere((u0(0),0.0,VectorValue(0.0,0.0)),X(0.0))
+
+  # Explicit FE functions
+  # global ηₙₕ = interpolate(u0(0),U(0.0))
+  # global uₙₕ = interpolate(u_ST,U(0.0))
+  # global fv_u = zero_free_values(U(0.0))
 
   # Stabilization Parameters
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  τₘ, τc, dτₘ, dτc = get_stabilization_parameters(Ω_f, ν_f, c₁, c₂, cc)
+  h = CellField(get_cell_measure(Ω_f),Ω_f)
+  h2Ω(dx) = dx^(1/2)
+  h2 = CellField(lazy_map(h2Ω,get_cell_measure(Ω_f)),Ω_f)
+  abs_(u) = (u⋅u)^(1/2)+1.0e-14
+  dabs_(u,du) = (u⋅du)/abs_(u)
+  τₘ⁻¹(u) = (c₁*ν_f/h2 + c₂*(abs_∘u)/h)
+  τₘ(u) = 1/τₘ⁻¹(u)
+  τc(u) = cc *(h2/(c₁*τₘ(u)))
+  dτₘ(u,du) = -1.0/(τₘ⁻¹(u)*τₘ⁻¹(u)) * (c₂*(dabs_∘(u,du)))
+  dτc(u,du) = -cc*h2/c₁ * (1/(τₘ(u)*τₘ(u))) * dτₘ(u,du)
+
+  # Orthogonal projection
+  # aη(u) = (η,κ) -> ∫( τₘ(u)*(η⋅κ) )dΩ_f
+  # bη(u) = (κ) -> ∫( τₘ(u)*((∇(u)'⋅u)⋅κ) )dΩ_f
+  # op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
+  # ls_proj = LUSolver()
+  # ηₕ(u) = solve(ls_proj,op_proj(u))
+
+  # buffer = Ref{Any}((η=nothing,t=nothing))
+  # function η(u,t)
+  #   if buffer[].t == t
+  #     return buffer[].η
+  #   else
+  #     buffer[] = (η=ηₕ(u),t=t)
+  #     return buffer[].η
+  #   end
+  # end
+
+  # Weak form
+
+  conv(a,∇u) = (∇u'⋅a)
+  ℒ(a,u,p) = (conv∘(a,∇(u))) + ∇(p)
+  ∂ₐℒ(da,u) = conv∘(da,∇(u))
+  𝒫(a,u,p,η) = ℒ(a,u,p)-η
+  ∂ₐ𝒫(da,u) = ∂ₐℒ(da,u)
+  neg(a) = min(a,0.0)
+  uₛ(a,u,p,η) = τₘ(a)*𝒫(a,u,p,η)
+  ∂uₛ(a,u,p,η,da,du,dp,dη) = dτₘ(a,da)*𝒫(a,u,p,η) + τₘ(a)*(𝒫(a,du,dp,dη)+∂ₐ𝒫(da,u))
+
+  c(a,u,v,dΩ) = ∫(0.5*((conv∘(a,∇(u)))⋅v - u⋅(conv∘(a,∇(v)))))dΩ
+  lap(u,v,dΩ) = ∫( ε(v) ⊙ (σ_dev_f ∘ ε(u)) )dΩ
+  div(u,q,dΩ) = ∫( q*(∇⋅u) )dΩ
+  stab(a,u,p,η,v,q,κ,dΩ) = ∫( uₛ(a,u,p,η)⋅𝒫(a,v,q,κ))dΩ
+  dstab(a,u,p,η,da,du,dp,dη,v,q,κ,dΩ) =
+    ∫( ∂uₛ(a,u,p,η,da,du,dp,dη)⋅𝒫(a,v,q,κ) )dΩ +
+    ∫( uₛ(a,u,p,η)⋅∂ₐ𝒫(da,v) )dΩ
+  graddiv(a,u,v,dΩ) = ∫( τc(a)*((∇⋅u)*(∇⋅v)) )dΩ
+  cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
 
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = conv(u,u,v,dΩ_f) +
-                           lap(ν_f,u,v,dΩ_f) -
+  res(t,(u,p,η),(v,q,κ)) = c(u,u,v,dΩ_f) +
+                           lap(u,v,dΩ_f) -
                            div(v,p,dΩ_f) +
                            div(u,q,dΩ_f) +
-                           stab(τₘ,u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(τc,u,u,v,dΩ_f) +
+                           stab(u,u,p,η,v,q,κ,dΩ_f) +
+                           graddiv(u,u,v,dΩ_f) +
                            cΓ(u,u,v,n_Γout,dΓout)
   jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
-    lap(ν_f,du,v,dΩ_f) -
+    c(du,u,v,dΩ_f) +
+    c(u,du,v,dΩ_f) +
+    lap(du,v,dΩ_f) -
     div(v,dp,dΩ_f) +
     div(du,q,dΩ_f) +
-    dconv(u,u,du,du,v,dΩ_f) +
-    dstab(τₘ,dτₘ,u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
-    dgraddiv(τc,dτc,u,u,du,du,v,dΩ_f) +
+    dstab(u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
+    ∫( τc(u)*((∇⋅du)*(∇⋅v)) )dΩ_f +
+    ∫( dτc(u,du)*((∇⋅u)*(∇⋅v)) )dΩ_f +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
   jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
 
   # NS operator
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
+  # op = TransientSemilinearFEOperator(mass, res, X, Y;constant_mass=true)
+
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=false,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
+  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
   ls_mass = LUSolver()
 
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
   ode_solver₁ = ThetaMethod(nls,Δt,1.0)
   ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_Midpoint_1_2()))
+  # ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_3_3()))
+  # ode_solver₂ = EXRungeKutta(ls_mass,Δt,ButcherTableau(EXRK_RungeKutta_4_4()))
 
   xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
   function get_step(xₜ)
@@ -149,10 +219,12 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
     for (t,(uh,ph,ηₕ)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
-      Fx, Fy = sum(∫(2ν_f*(n_ΓS ⋅ ε(uh)) - ph * n_ΓS) * dΓₛ)
+      Fx, Fy = sum(∫((n_ΓS ⋅ σ_dev_f(ε(uh))) - ph * n_ΓS) * dΓₛ)
       to_forcefile(t,Fx,Fy)
+      # uₙₕ = interpolate!(uh,fv_u,U(t))
+      # ηₙₕ = solve(ls_proj,op_proj(uₙₕ))
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(τₘ,uh,uh,ph,ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(uh,uh,ph,ηₕ)],order=2)
         tout=t+Δtout
       end
     end
