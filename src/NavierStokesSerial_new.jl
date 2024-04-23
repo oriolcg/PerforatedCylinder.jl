@@ -1,24 +1,18 @@
-function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δtout)
+function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
 
-  if i_am_main(parts)
-    io = open("output.log", "w")
-    forces_path=ENV["PerforatedCylinder_FORCES"]
-    full_force_path = joinpath(forces_path,force_file)
-    io_force = open(full_force_path, "w")
-  end
+  io = open("output.log", "w")
+  forces_path=ENV["PerforatedCylinder_FORCES"]
+  full_force_path = joinpath(forces_path,force_file)
+  io_force = open(full_force_path, "w")
   function to_logfile(x...)
-    if i_am_main(parts)
-      write(io,join(x, " ")...)
-      write(io,"\n")
-      flush(io)
-    end
+    write(io,join(x, " ")...)
+    write(io,"\n")
+    flush(io)
   end
   function to_forcefile(x...)
-    if i_am_main(parts)
-      write(io_force,join(x, " ")...)
-      write(io_force,"\n")
-      flush(io_force)
-    end
+    write(io_force,join(x, " ")...)
+    write(io_force,"\n")
+    flush(io_force)
   end
 
   # Geometry
@@ -29,7 +23,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   full_mesh_path = joinpath(meshes_path,mesh_file)
   to_logfile("Mesh file: ",full_mesh_path)
   testname = replace(mesh_file,".msh" =>"")
-  model =  GmshDiscreteModel(parts,full_mesh_path)
+  model =  GmshDiscreteModel(full_mesh_path)
   Ω = Triangulation(model)
   Ω_f = Triangulation(model, tags = "fluid")
   Γ_S = Boundary(model, tags = "monopile")
@@ -93,29 +87,9 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   l((v, q)) = ∫(0.0 * q)dΩ_f
   stokes_op = AffineFEOperator(a,l,X₀,Y)
 
-  # Setup solver via low level PETSC API calls
-  function mykspsetup(ksp)
-    pc       = Ref{GridapPETSc.PETSC.PC}()
-    mumpsmat = Ref{GridapPETSc.PETSC.Mat}()
-    @check_error_code GridapPETSc.PETSC.KSPSetType(ksp[],GridapPETSc.PETSC.KSPPREONLY)
-    @check_error_code GridapPETSc.PETSC.KSPGetPC(ksp[],pc)
-    @check_error_code GridapPETSc.PETSC.PCSetType(pc[],GridapPETSc.PETSC.PCLU)
-    @check_error_code GridapPETSc.PETSC.PCFactorSetMatSolverType(pc[],GridapPETSc.PETSC.MATSOLVERMUMPS)
-    @check_error_code GridapPETSc.PETSC.PCFactorSetUpMatSolverType(pc[])
-    @check_error_code GridapPETSc.PETSC.PCFactorGetMatrix(pc[],mumpsmat)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  4, 2)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  7, 0)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  14, 500000)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[],  24, 1)
-    # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 28, 2)
-    # @check_error_code GridapPETSc.PETSC.MatMumpsSetIcntl(mumpsmat[], 29, 2)
-    @check_error_code GridapPETSc.PETSC.MatMumpsSetCntl(mumpsmat[], 3, 1.0e-10)
-    @check_error_code GridapPETSc.PETSC.KSPSetFromOptions(ksp[])
-  end
-
   # Linear Solver
   to_logfile("Stokes solve")
-  ls₀ = PETScLinearSolver(mykspsetup)
+  ls₀ = LUSolver()
   u_ST, p_ST = solve(ls₀,stokes_op)
 
   # initial condition NS
@@ -133,7 +107,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   aη(u) = (η,κ) -> ∫( τₘ(u,h,h2)*(η⋅κ) )dΩ_f
   bη(u) = (κ) -> ∫( τₘ(u,h,h2)*((u⋅∇(u))⋅κ) )dΩ_f
   op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
-  ls_proj = PETScLinearSolver(mykspsetup)
+  ls_proj = LUSolver()
   ηₕ(u) = solve(ls_proj,op_proj(u))
   fv_u = zero_free_values(U(0.0))
   uₙₕ(u,t) = interpolate!(u,fv_u,U(t-Δt))
@@ -143,6 +117,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
     if buffer[].t == t
       return buffer[].η
     else
+      println("Computing η")
       buffer[] = (η=ηₕ(u),t=t)
       return buffer[].η
     end
@@ -153,6 +128,7 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
       return buffer2[].u
     else
       buffer2[] = (u=uₙₕ(u,t),t=t)
+      println("Computing uₙ")
       return buffer2[].u
     end
   end
@@ -181,8 +157,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
 
   # Nonlinear Solver
-  nls = PETScNonlinearSolver()
-  ls_mass = PETScLinearSolver(mykspsetup)
+  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
+  ls_mass = LUSolver()
 
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
@@ -199,11 +175,9 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁)
 
   # Postprocess
-  if i_am_main(parts)
-    println("Postprocess")
-  end
+  println("Postprocess")
   global tout = 0
-  createpvd(parts,"NS_test") do pvd
+  createpvd("NS_test") do pvd
     for (t,(uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
@@ -217,10 +191,8 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
     end
   end
 
-  if i_am_main(parts)
-    close(io)
-    close(io_force)
-  end
+  close(io)
+  close(io_force)
 
   return nothing
 end

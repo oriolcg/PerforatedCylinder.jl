@@ -106,6 +106,36 @@ function f_stab(τₘ,h,h2,a,u,p,η,v,q,κ,x)
 
 end
 
+function f_stab_expl(τₘ,h,h2,a,u,p,η,v,q,x)
+  # Functions
+  ax = a(x)
+  ηx = η(x)
+
+  # Gradients
+  ∇ux = ∇(u)(x)
+  ∇px = ∇(p)(x)
+  ∇vx = ∇(v)(x)
+  ∇qx = ∇(q)(x)
+
+  # Stabilization parameters
+  τₘx = τₘ(a,h,h2)(x)
+
+  # Convective Terms
+  cᵤx = conv_bc(ax,∇ux)
+  cᵥx = conv_bc(ax,∇vx)
+
+  # Operators
+  ℒᵤx = lazy_map(BroadcastingFieldOpMap(+),cᵤx,∇px)
+  𝒫ᵤx = lazy_map(BroadcastingFieldOpMap(-),ℒᵤx,ηx)
+  ℒᵥx = lazy_map(BroadcastingFieldOpMap(+),cᵥx,∇qx)
+
+  # Subscales
+  uₛx = lazy_map(BroadcastingFieldOpMap(*),τₘx,𝒫ᵤx)
+
+  return lazy_map(BroadcastingFieldOpMap(⋅),uₛx,ℒᵥx)
+
+end
+
 function f_graddiv(τc,h,h2,a,u,v,x)
   τcx = τc(a,h,h2)(x)
   divux = (∇⋅u)(x)
@@ -122,6 +152,7 @@ div(u,q,dΩ) = ∫( q*(∇⋅u) )dΩ
 cΓ(a,u,v,nΓ,dΓ) = ∫( (a⋅v)*(0.5*(u⋅nΓ)-neg∘(u⋅nΓ)) )dΓ
 conv(a,u,v,dΩ::Measure) = own_integrate(x->f_conv(a,u,v,x),dΩ)
 stab(τₘ,h,h2,a,u,p,η,v,q,κ,dΩ::Measure) = own_integrate(x->f_stab(τₘ,h,h2,a,u,p,η,v,q,κ,x),dΩ)
+stab_expl(τₘ,h,h2,a,u,p,η,v,q,dΩ::Measure) = own_integrate(x->f_stab_expl(τₘ,h,h2,a,u,p,η,v,q,x),dΩ)
 graddiv(τc,h,h2,a,u,v,dΩ::Measure) = own_integrate(x->f_graddiv(τc,h,h2,a,u,v,x), dΩ)
 function conv(a,u,v,dΩ::GridapDistributed.DistributedMeasure)
   contribs = map(a.fields,u.fields,v.fields,dΩ.measures) do af,uf,vf,m
@@ -132,6 +163,12 @@ end
 function stab(τₘ,h,h2,a,u,p,η,v,q,κ,dΩ::GridapDistributed.DistributedMeasure)
   contribs = map(h.fields,h2.fields,a.fields,u.fields,p.fields,η.fields,v.fields,q.fields,κ.fields,dΩ.measures) do hf,h2f,af,uf,pf,ηf,vf,qf,κf,m
     stab(τₘ,hf,h2f,af,uf,pf,ηf,vf,qf,κf,m)
+  end
+  GridapDistributed.DistributedDomainContribution(contribs)
+end
+function stab_expl(τₘ,h,h2,a,u,p,η,v,q,dΩ::GridapDistributed.DistributedMeasure)
+  contribs = map(h.fields,h2.fields,a.fields,u.fields,p.fields,η.fields,v.fields,q.fields,dΩ.measures) do hf,h2f,af,uf,pf,ηf,vf,qf,m
+    stab_expl(τₘ,hf,h2f,af,uf,pf,ηf,vf,qf,m)
   end
   GridapDistributed.DistributedDomainContribution(contribs)
 end
@@ -221,6 +258,47 @@ function f_dstab(τₘ,dτₘ,h,h2,a,u,p,η,da,du,dp,dη,v,q,κ,x)
 
 end
 
+function f_dstab_expl(τₘ,h,h2,a,u,p,η,du,dp,v,q,x)
+
+  # Functions
+  ax = a(x)
+  ηx = η(x)
+
+  # Gradients
+  ∇ux = ∇(u)(x)
+  ∇vx = ∇(v)(x)
+  ∇qx = ∇(q)(x)
+  ∇dux = ∇(du)(x)
+  ∇dpx = ∇(dp)(x)
+
+  # Stabilization parameters
+  τₘx = τₘ(a,h,h2)(x)
+
+  # Convective Terms
+  cᵥx = conv_bc(ax,∇vx)
+  cdux = conv_bc(ax,∇dux)
+
+  # # Operators
+  # ℒdux = lazy_map(BroadcastingFieldOpMap(+),cdux,∇px)
+  # ℒᵥx = lazy_map(BroadcastingFieldOpMap(+),cᵥx,∇qx)
+
+  # # Subscales
+  # uₛx = lazy_map(BroadcastingFieldOpMap(*),τₘx,𝒫ᵤx)
+
+  # return lazy_map(BroadcastingFieldOpMap(⋅),uₛx,ℒᵥx)
+
+  # Operators
+  ℒdux = lazy_map(BroadcastingFieldOpMap(+),cdux,∇dpx)
+  # 𝒫dux = lazy_map(BroadcastingFieldOpMap(-),ℒdux,ηx)
+  ℒᵥx = lazy_map(BroadcastingFieldOpMap(+),cᵥx,∇qx)
+
+  # Subscales
+  ∂uₛx = lazy_map(BroadcastingFieldOpMap(*),τₘx,ℒdux)
+
+  return lazy_map(BroadcastingFieldOpMap(⋅),∂uₛx,ℒᵥx)
+
+end
+
 function f_dgraddiv(τc,dτc,h,h2,a,u,da,du,v,x)
   τcx = τc(a,h,h2)(x)
   divux = (∇⋅u)(x)
@@ -237,6 +315,17 @@ function f_dgraddiv(τc,dτc,h,h2,a,u,da,du,v,x)
 
 end
 
+function f_dgraddiv_expl(τc,h,h2,a,u,du,v,x)
+  τcx = τc(a,h,h2)(x)
+  divvx = (∇⋅v)(x)
+  divdux = (∇⋅du)(x)
+
+  divdudivvx = lazy_map(BroadcastingFieldOpMap(⋅),divdux,divvx)
+
+  return lazy_map(BroadcastingFieldOpMap(*),τcx,divdudivvx)
+
+end
+
 function f_div(du,dp,v,q,x)
   divux = (∇⋅du)(x)
   divvx = (∇⋅v)(x)
@@ -250,7 +339,9 @@ end
 # Jacobian terms wrappers
 dconv(a,u,da,du,v,dΩ::Measure) = own_integrate(x->f_dconv(a,u,da,du,v,x),dΩ)
 dstab(τₘ,dτₘ,h,h2,a,u,p,η,da,du,dp,dη,v,q,κ,dΩ::Measure) = own_integrate(x->f_dstab(τₘ,dτₘ,h,h2,a,u,p,η,da,du,dp,dη,v,q,κ,x),dΩ)
+dstab_expl(τₘ,h,h2,a,u,p,η,du,dp,v,q,dΩ::Measure) = own_integrate(x->f_dstab_expl(τₘ,h,h2,a,u,p,η,du,dp,v,q,x),dΩ)
 dgraddiv(τc,dτc,h,h2,a,u,da,du,v,dΩ::Measure) = own_integrate(x->f_dgraddiv(τc,dτc,h,h2,a,u,da,du,v,x), dΩ)
+dgraddiv_expl(τc,h,h2,a,u,du,v,dΩ::Measure) = own_integrate(x->f_dgraddiv_expl(τc,h,h2,a,u,du,v,x), dΩ)
 function dconv(a,u,da,du,v,dΩ::GridapDistributed.DistributedMeasure)
   contribs = map(a.fields,u.fields,da.fields,du.fields,v.fields,dΩ.measures) do af,uf,daf,duf,vf,m
     dconv(af,uf,daf,duf,vf,m)
@@ -263,9 +354,21 @@ function dstab(τₘ,dτₘ,h,h2,a,u,p,η,da,du,dp,dη,v,q,κ,dΩ::GridapDistrib
   end
   GridapDistributed.DistributedDomainContribution(contribs)
 end
+function dstab_expl(τₘ,h,h2,a,u,p,η,du,dp,v,q,dΩ::GridapDistributed.DistributedMeasure)
+  contribs = map(h.fields,h2.fields,a.fields,u.fields,p.fields,η.fields,du.fields,dp.fields,v.fields,q.fields,dΩ.measures) do hf,h2f,af,uf,pf,ηf,duf,dpf,vf,qf,m
+    dstab_expl(τₘ,hf,h2f,af,uf,pf,ηf,duf,dpf,vf,qf,m)
+  end
+  GridapDistributed.DistributedDomainContribution(contribs)
+end
 function dgraddiv(τc,dτc,h,h2,a,u,da,du,v,dΩ::GridapDistributed.DistributedMeasure)
   contribs = map(h.fields,h2.fields,a.fields,u.fields,da.fields,du.fields,v.fields,dΩ.measures) do hf,h2f,af,uf,daf,duf,vf,m
     dgraddiv(τc,dτc,hf,h2f,af,uf,daf,duf,vf,m)
+  end
+  GridapDistributed.DistributedDomainContribution(contribs)
+end
+function dgraddiv_expl(τc,h,h2,a,u,du,v,dΩ::GridapDistributed.DistributedMeasure)
+  contribs = map(h.fields,h2.fields,a.fields,u.fields,du.fields,v.fields,dΩ.measures) do hf,h2f,af,uf,duf,vf,m
+    dgraddiv_expl(τc,hf,h2f,af,uf,duf,vf,m)
   end
   GridapDistributed.DistributedDomainContribution(contribs)
 end
