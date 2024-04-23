@@ -100,23 +100,24 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  τₘ, τc, dτₘ, dτc = get_stabilization_parameters(Ω_f, ν_f, c₁, c₂, cc)
+  h, h2 = get_mesh_sizes(Ω_f)
+  τₘ, τc, dτₘ, dτc = get_stabilization_parameters(ν_f, c₁, c₂, cc)
 
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
   res(t,(u,p,η),(v,q,κ)) = conv(u,u,v,dΩ_f) +
                            lap(ν_f,u,v,dΩ_f) -
                            div(v,p,dΩ_f) +
                            div(u,q,dΩ_f) +
-                           stab(τₘ,u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(τc,u,u,v,dΩ_f) +
+                           stab(τₘ,h,h2,u,u,p,η,v,q,κ,dΩ_f) +
+                           graddiv(τc,h,h2,u,u,v,dΩ_f) +
                            cΓ(u,u,v,n_Γout,dΓout)
   jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
     lap(ν_f,du,v,dΩ_f) -
     div(v,dp,dΩ_f) +
     div(du,q,dΩ_f) +
     dconv(u,u,du,du,v,dΩ_f) +
-    dstab(τₘ,dτₘ,u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
-    dgraddiv(τc,dτc,u,u,du,du,v,dΩ_f) +
+    dstab(τₘ,dτₘ,h,h2,u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
+    dgraddiv(τc,dτc,h,h2,u,u,du,du,v,dΩ_f) +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
   jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
@@ -152,7 +153,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       Fx, Fy = sum(∫(2ν_f*(n_ΓS ⋅ ε(uh)) - ph * n_ΓS) * dΓₛ)
       to_forcefile(t,Fx,Fy)
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(τₘ,uh,uh,ph,ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(τₘ,h,h2,uh,uh,ph,ηₕ)],order=2)
         tout=t+Δtout
       end
     end

@@ -29,7 +29,8 @@ include("weak_form.jl")
 include("NavierStokesSerial_coupled.jl")
 # include("NavierStokesSerial_coupled_blockPrec.jl")
 # include("NavierStokesParallel.jl")
-include("NavierStokesParallel_coupled.jl")
+# include("NavierStokesParallel_coupled.jl")
+include("NavierStokesParallel_new.jl")
 include("mesh_generation.jl")
 include("mesh_generation_length.jl")
 
@@ -135,7 +136,7 @@ function main_parallel(np;
   cd(output_path)
   with_mpi() do distribute
     options = options_mumps
-    ranks = distribute_with_mpi(LinearIndices((np,)))
+    ranks = distribute(LinearIndices((np,)))
     GridapPETSc.with(args=split(options)) do
       run_test_parallel(ranks,mesh_file,force_file,Δt,tf,Δtout)
     end

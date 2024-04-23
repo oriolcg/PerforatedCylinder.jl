@@ -98,7 +98,7 @@ end
   mesh_file = testname * ".msh"
   force_file = testname * ".csv"
   vtks_path = ENV["PerforatedCylinder_VTKs"]
-  output_path = joinpath(vtks_path,"results_"*testname)
+  output_path = joinpath(vtks_path,"serial_results_"*testname)
   # output_path = joinpath(vtks_path,"results_"*testname)
   if isdir(output_path)
     println("Existing case. Exiting execution without computing.")
@@ -119,7 +119,7 @@ end
   else
     Δt = 0.01
     # Δt = Δt
-    tf = 50.0
+    tf = 0.5
     Δtout = 0.05
   end
   PerforatedCylinder.main_serial(mesh_file=mesh_file,

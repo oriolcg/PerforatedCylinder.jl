@@ -78,20 +78,20 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   V = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
   Q = TestFESpace(Ω, reffeₚ,   conformity= :C0)
   Κ = TestFESpace(Ω, reffeᵤ,  dirichlet_tags = DIRICHLET_tags, dirichlet_masks=DIRICHLET_masks, conformity = :H1)
-  Y = MultiFieldFESpace([V, Q, Κ])
-  Y₀ = MultiFieldFESpace([V, Q])
+  Y = MultiFieldFESpace([V, Q])
+  # Y₀ = MultiFieldFESpace([V, Q])
 
   # Define trial FESpaces from Dirichlet values
   U = TransientTrialFESpace(V, U0_dirichlet)
   P = TrialFESpace(Q)
   Η = TrialFESpace(Κ,[VectorValue(0.0,0.0),VectorValue(0.0,0.0),VectorValue(0.0,0.0)])
-  X = TransientMultiFieldFESpace([U, P,Η])
+  X = TransientMultiFieldFESpace([U, P])
   X₀ = MultiFieldFESpace([U(0.0), P])
 
   # Stokes for pre-initalize NS
   a((u, p), (v, q)) = ∫( 2ν_f*(ε(v) ⊙ ε(u)) - (∇ ⋅ v) * p + q * (∇ ⋅ u))dΩ_f
   l((v, q)) = ∫(0.0 * q)dΩ_f
-  stokes_op = AffineFEOperator(a,l,X₀,Y₀)
+  stokes_op = AffineFEOperator(a,l,X₀,Y)
 
   # Setup solver via low level PETSC API calls
   function mykspsetup(ksp)
@@ -120,31 +120,59 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
 
   # initial condition NS
   to_logfile("Navier-Stokes operator")
-  ηₕ₀ = interpolate_everywhere(VectorValue(0.0,0.0),Η)
-  xh₀ = interpolate_everywhere([u_ST, p_ST, ηₕ₀],X(0.0))
+  xh₀ = interpolate_everywhere([u_ST, p_ST],X(0.0))
 
   # Stabilization Parameters
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
   h, h2 = get_mesh_sizes(Ω_f)
-  τₘ, τc, dτₘ, dτc = get_stabilization_parameters(ν_f, c₁, c₂, cc)
+  τₘ, τc, dτₘ, dτc = get_stabilization_parameters_(ν_f, c₁, c₂, cc)
 
+  # Orthogonal projection
+  aη(u) = (η,κ) -> ∫( τₘ(u,h,h2)*(η⋅κ) )dΩ_f
+  bη(u) = (κ) -> ∫( τₘ(u,h,h2)*((u⋅∇(u))⋅κ) )dΩ_f
+  op_proj(u) = AffineFEOperator(aη(u),bη(u),Η,Κ)
+  ls_proj = PETScLinearSolver(mykspsetup)
+  ηₕ(u) = solve(ls_proj,op_proj(u))
+  fv_u = zero_free_values(U(0.0))
+  uₙₕ(u,t) = interpolate!(u,fv_u,U(t-Δt))
+
+  buffer = Ref{Any}((η=nothing,t=nothing))
+  function η(u,t)
+    if buffer[].t == t
+      return buffer[].η
+    else
+      buffer[] = (η=ηₕ(u),t=t)
+      return buffer[].η
+    end
+  end
+  buffer2 = Ref{Any}((u=nothing,t=nothing))
+  function uₙ(u,t)
+    if buffer2[].t == t
+      return buffer2[].u
+    else
+      buffer2[] = (u=uₙₕ(u,t),t=t)
+      return buffer2[].u
+    end
+  end
+
+  # Weak form
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = conv(u,u,v,dΩ_f) +
-                           lap(ν_f,u,v,dΩ_f) -
-                           div(v,p,dΩ_f) +
-                           div(u,q,dΩ_f) +
-                           stab(τₘ,h,h2,u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(τc,h,h2,u,u,v,dΩ_f) +
-                           cΓ(u,u,v,n_Γout,dΓout)
-  jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
+  res(t,(u,p),(v,q)) =  conv(u,u,v,dΩ_f) +
+                        lap(ν_f,u,v,dΩ_f) -
+                        div(v,p,dΩ_f) +
+                        div(u,q,dΩ_f) +
+                        stab(τₘ,h,h2,uₙ(u,t),u,p,η(uₙ(u,t),t),v,q,0.0*v,dΩ_f) +
+                        graddiv(τc,h,h2,uₙ(u,t),u,v,dΩ_f) +
+                        cΓ(u,u,v,n_Γout,dΓout)
+  jac(t,(u,p),(du,dp),(v,q)) =
     lap(ν_f,du,v,dΩ_f) -
     div(v,dp,dΩ_f) +
     div(du,q,dΩ_f) +
     dconv(u,u,du,du,v,dΩ_f) +
-    dstab(τₘ,dτₘ,h,h2,u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
-    dgraddiv(τc,dτc,h,h2,u,u,du,du,v,dΩ_f) +
+    dstab(τₘ,dτₘ,h,h2,uₙ(u,t),u,p,η(uₙ(u,t),t),0.0*du,du,dp,0.0*du,v,q,0.0*v,dΩ_f) +
+    dgraddiv(τc,dτc,h,h2,uₙ(u,t),u,0.0*du,du,v,dΩ_f) +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
   jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
@@ -176,13 +204,14 @@ function run_test_parallel(parts,mesh_file::String,force_file::String,Δt,tf,Δt
   end
   global tout = 0
   createpvd(parts,"NS_test") do pvd
-    for (t,(uh,ph,ηₕ)) in xₜ
+    for (t,(uh,ph)) in xₜ
       to_logfile("Time: $t")
       to_logfile("=======================")
       Fx, Fy = sum(∫(2ν_f*(n_ΓS ⋅ ε(uh)) - ph * n_ΓS) * dΓₛ)
       to_forcefile(t,Fx,Fy)
+      ηh = buffer[].η
       if t>=tout
-        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηₕ,"usgs"=>uₛ(τₘ,h,h2,uh,uh,ph,ηₕ)],order=2)
+        pvd[t] = createvtk(Ω,"NS_test_$t",cellfields=["u"=>uh,"p"=>ph,"eta_n"=>ηh,"usgs"=>uₛ(τₘ,h,h2,uh,uh,ph,ηh)],order=2)
         tout=t+Δtout
       end
     end

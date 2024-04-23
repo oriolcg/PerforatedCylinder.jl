@@ -1,28 +1,27 @@
+module Run_Case_Parallel
 using MPI
 MPI.Init()
 comm = MPI.COMM_WORLD
 using PerforatedCylinder
 
 # Paths
-const project_root = ".."
+const project_root = joinpath(@__DIR__,"..")
 const data_dir = project_root * "/data"
 const OVERWRITE = true
 
 # Define cases
-nbeta = 21
-nalpha = 1
-nperfs = 40
-perf_cases = 3:30#[3,9,27]
+perf_cases = 3:30
 porosities = 0.3:0.02:0.7
+# lengths = 5:15
 alphas = [0.0]#:15.0/(nalpha-1):15.0
-cases = []
+cases = []#["tmp_coarse"]
+
 for num_perforations in perf_cases
   for β in porosities
-    for α in alphas
-      β2 = round(β;digits=2)
-      α2 = round(α,digits=2)
-      push!(cases,"$num_perforations-$β2-$α2")
-    end
+    α = 0.0
+    β2 = round(β;digits=2)
+    α2 = round(α,digits=2)
+    push!(cases,"$β2-$num_perforations")
   end
 end
 
@@ -31,9 +30,9 @@ np = MPI.Comm_size(comm)
 case_id = parse(Int,ENV["CASE_ID"])
 testname = cases[case_id]
 mesh_file = testname * ".msh"
-force_file = testname * ".csv"
+force_file = "parallel_" * testname * ".csv"
 vtks_path = ENV["PerforatedCylinder_VTKs"]
-output_path = joinpath(vtks_path,"results_"*testname*"-$np")
+output_path = joinpath(vtks_path,"parallel_results_"*testname*"-$np")
 if isdir(output_path)
   if MPI.Comm_rank(comm)==0
     println("Existing case. Exiting execution without computing.")
@@ -58,8 +57,9 @@ PerforatedCylinder.main_parallel(np;
   force_file=force_file,
   output_path=output_path,
   Δt=0.01,
-  tf=2.0,
+  tf=0.5,
   Δtout=0.05,
 )
 
 MPI.Finalize()
+end
