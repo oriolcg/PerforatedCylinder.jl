@@ -119,7 +119,7 @@ end
   else
     Δt = 0.01
     # Δt = Δt
-    tf = 0.5
+    tf = 50.0
     Δtout = 0.05
   end
   PerforatedCylinder.main_serial(mesh_file=mesh_file,

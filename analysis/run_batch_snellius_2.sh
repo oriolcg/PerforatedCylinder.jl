@@ -3,13 +3,13 @@
 #SBATCH --job-name="perf_cylinder"
 #SBATCH --partition=genoa
 #SBATCH --time=02:00:00
-#SBATCH -n 2
+#SBATCH -n 192
 #SBATCH -o stdout-benchmark/slurm-%j-%4t-%n.out
 #SBATCH -e stdout-benchmark/slurm-%j-%4t-%n.err
 
 source ../compile/modules_snellius.sh
 INITIAL_CASE=1
-FINAL_CASE=1
+FINAL_CASE=96
 for i in $(seq $INITIAL_CASE $FINAL_CASE)
 do
     echo "case: $i"
