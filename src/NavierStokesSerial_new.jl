@@ -163,7 +163,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   # ODE solvers:
   # 1 time step with BE to kill spurious oscillations in force
   ode_solver₁ = ThetaMethod(nls,Δt,1.0)
-  ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_Midpoint_1_2()))
+  # ode_solver₂ = DIMRungeKutta(nls,ls_mass,Δt,ButcherTableau(SDIRK_Midpoint_1_2()))
+  ode_solver₂ = GeneralizedAlpha1(nls,Δt,0.5)
 
   xₜ₁ = solve(ode_solver₁,op,t₀,t₀+Δt,xh₀)
   function get_step(xₜ)
@@ -172,7 +173,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
     end
   end
   xh₁ = get_step(xₜ₁)
-  xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁)
+  xh₁ₜ = (xh₁,interpolate_everywhere([VectorValue(0.0,0.0),0.0],X(t₀+Δt)))
+  xₜ = solve(ode_solver₂,op,t₀+Δt,tf,xh₁ₜ)
 
   # Postprocess
   println("Postprocess")
