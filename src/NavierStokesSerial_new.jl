@@ -140,7 +140,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   Cᵦ = 32.0
   fₜ(u) = u + exp(-χ*B)*(exp(χ*u) - 1.0 - χ*u - 0.5*(χ^2*u^2) -(1/6)*(χ^3*u^3) )
   dfₜ(u) = 1 + χ*exp(-χ*B)*(exp(χ*u) - 1.0 - χ*u - 0.5*(χ^2*u^2) )
-  τ_(h) = γ*ν_f/h
+  τ_(h) = Cᵦ*ν_f/h
   y⁺_(h,absᵤ,τ) = h/(γ*ν_f)*√(absᵤ*τ)
   I = TensorValue(1.0,0.0,0.0,1.0)
   function τᵦ(u,u₀,h,n)
@@ -158,8 +158,8 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
       y⁺ = y⁺_(h,absᵤ,τ)
       r = y⁺ - fₜ(u⁺)
     end
-    τₜ = (τ/absᵤ)*(I-n⊗n)
-    τₙ = (Cᵦ*ν_f/h)*(n⊗n)
+    τₜ = τ*(I-n⊗n)
+    τₙ = γ*τ_(h)*(n⊗n)
     return τₜ+τₙ
   end
   buffer3 = Ref{Any}((τᵦ=nothing,t=nothing))
