@@ -100,24 +100,50 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   c₁ = 12.0
   c₂ = 2.0
   cc = 4.0
-  h, h2 = get_mesh_sizes(Ω_f)
-  τₘ, τc, dτₘ, dτc = get_stabilization_parameters(ν_f, c₁, c₂, cc)
+  h, h2 = get_mesh_sizes(Ω)
+  τₘ, τc, dτₘ, dτc = get_stabilization_parameters_(ν_f, c₁, c₂, cc)
+
+  # TMP weak form
+  # stab_expl_(u,p,v,q,t) = ∫( τₘ(u,h,h2) * ((∇(u)'⋅u + ∇(p) - η(uₙ(u,t),t))⋅(∇(v)'⋅u)+∇(q)) )dΩ_f
+  𝒞ᵤ(a,∇u) = a⋅∇u
+  ℒᵤ(a,∇u,∇p) = 𝒞ᵤ(a,∇u) + ∇p
+  𝒫ᵤ(a,∇u,∇p,η) = ℒᵤ(a,∇u,∇p) - η
+  skew_conv(a,u,v,∇u,∇v) =  0.5*(𝒞ᵤ(a,∇u)⋅v - 𝒞ᵤ(a,∇v)⋅u)
+  sym_lapl(εu,εv) = 2ν_f*(εu⊙εv)
+  div_term(divu,q) = divu*q
+  skew_conv_Γ(a,u,v,n) = (u⋅v)*(0.5*(a⋅n)-neg(a⋅n))
+  penalty(τ,u₀,u,v) = (τ⋅(u-u₀))⋅v
+  dpenalty(τ,du,v) = (τ⋅du)⋅v
+  complementary_uv(u₀,u,εv,n) = 2ν_f * ((n⋅εv)⋅(u-u₀))
+  complementary_uq(u₀,u,q,n) = 2ν_f * ((q*n)⋅(u-u₀))
+  dcomplementary_uv(du,εv,n) = 2ν_f * ((n⋅εv)⋅(du))
+  dcomplementary_uq(du,q,n) = 2ν_f * ((q*n)⋅(du))
+  u0cf(t) = CellField(u0(t),Γ_S)
 
   mass(t,(∂ₜu,),(v,)) = ∫( ∂ₜu⋅v )dΩ_f
-  res(t,(u,p,η),(v,q,κ)) = conv(u,u,v,dΩ_f) +
-                           lap(ν_f,u,v,dΩ_f) -
-                           div(v,p,dΩ_f) +
-                           div(u,q,dΩ_f) +
-                           stab(τₘ,h,h2,u,u,p,η,v,q,κ,dΩ_f) +
-                           graddiv(τc,h,h2,u,u,v,dΩ_f) +
-                           cΓ(u,u,v,n_Γout,dΓout)
+  res(t,(u,p,η),(v,q,κ)) =
+    ∫( (sym_lapl∘(ε(u),ε(v))) +
+       (skew_conv∘(u,u,v,∇(u),∇(v))) +
+       (div_term∘((∇⋅u),q)) -
+       (div_term∘((∇⋅v),p)) +
+       (τₘ∘(u,h,h2)) * ((𝒫ᵤ∘(u,∇(u),∇(p),η))⋅((𝒞ᵤ∘(u,∇(v)))+∇(q)-κ)) +
+       (τc∘(u,h,h2)) * ((∇⋅u)*(∇⋅v)) )dΩ_f+
+    # conv(u,u,v,dΩ_f) +
+    # lap(ν_f,u,v,dΩ_f) -
+    # div(v,p,dΩ_f) +
+    # div(u,q,dΩ_f) +
+    # stab(τₘ,h,h2,u,u,p,η,v,q,κ,dΩ_f) +
+    # graddiv(τc,h,h2,u,u,v,dΩ_f) +
+    # ∫( (skew_conv_Γ∘(u,u,v,n_Γout)) )dΓout #+
+    cΓ(u,u,v,n_Γout,dΓout)
   jac(t,(u,p,η),(du,dp,dη),(v,q,κ)) =
-    lap(ν_f,du,v,dΩ_f) -
-    div(v,dp,dΩ_f) +
-    div(du,q,dΩ_f) +
-    dconv(u,u,du,du,v,dΩ_f) +
+  ∫( (sym_lapl∘(ε(du),ε(v)))  +
+      0.5*((𝒞ᵤ∘(du,∇(u)))⋅v + (𝒞ᵤ∘(u,∇(du)))⋅v - (𝒞ᵤ∘(du,∇(v)))⋅u - (𝒞ᵤ∘(u,∇(v)))⋅du) +
+     (div_term∘((∇⋅du),q)) -
+     (div_term∘((∇⋅v),dp)) +
+     (τc∘(u,h,h2)) * ((∇⋅du)*(∇⋅v)) +
+     (dτc∘(u,du,h,h2)) * ((∇⋅u)*(∇⋅v)) )dΩ_f +
     dstab(τₘ,dτₘ,h,h2,u,u,p,η,du,du,dp,dη,v,q,κ,dΩ_f) +
-    dgraddiv(τc,dτc,h,h2,u,u,du,du,v,dΩ_f) +
     ∫( (du⋅v)*(0.5*(u⋅n_Γout)-neg∘(u⋅n_Γout)) )dΓout +
     ∫( (u⋅v)*(0.5*(du⋅n_Γout)-neg∘(du⋅n_Γout)) )dΓout
   jac_t(t,(u,),(dut,),(v,)) = ∫( dut⋅v )dΩ_f
@@ -126,7 +152,7 @@ function run_test_serial(mesh_file::String,force_file::String,Δt,tf,Δtout)
   op = TransientSemilinearFEOperator(mass, res, (jac, jac_t), X, Y;constant_mass=true)
 
   # Nonlinear Solver
-  nls = NLSolver(LUSolver(),show_trace=false,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
+  nls = NLSolver(LUSolver(),show_trace=true,method=:newton,iterations=10,ftol=1.0e-6)#, linesearch=BackTracking())
   ls_mass = LUSolver()
 
   # ODE solvers:

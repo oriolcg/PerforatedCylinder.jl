@@ -26,8 +26,8 @@ using DataFrames
 
 # include("NavierStokesSerial.jl")
 include("weak_form.jl")
-include("NavierStokesSerial_new.jl")
-# include("NavierStokesSerial_coupled.jl")
+# include("NavierStokesSerial_new.jl")
+include("NavierStokesSerial_coupled.jl")
 # include("NavierStokesSerial_coupled_blockPrec.jl")
 # include("NavierStokesParallel.jl")
 # include("NavierStokesParallel_coupled.jl")
