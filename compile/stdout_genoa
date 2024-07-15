@@ -1,0 +1,62 @@
+Running serial test: tmp_coarse.msh, forces.csv, 0.5, 1.0, 0.5
+Info    : Reading '/gpfs/scratch1/nodespecific/int4/colomeso/tests/PerforatedCylinder.jl/data/meshes/tmp_coarse.msh'...
+Info    : 37 entities
+Info    : 154 nodes
+Info    : 330 elements
+Info    : Done reading '/gpfs/scratch1/nodespecific/int4/colomeso/tests/PerforatedCylinder.jl/data/meshes/tmp_coarse.msh'
+Iter     f(x) inf-norm    Step 2-norm 
+------   --------------   --------------
+     0     2.198753e+00              NaN
+     1     2.009068e-01     7.707644e+02
+     2     9.599001e-03     6.637377e+01
+     3     2.356031e-03     1.849649e+00
+     4     3.151666e-04     8.540156e-02
+     5     8.523568e-05     2.295651e-03
+     6     3.149454e-05     1.834119e-04
+     7     1.094290e-05     1.851374e-05
+     8     3.743933e-06     2.041972e-06
+     9     1.275913e-06     2.344767e-07
+    10     4.340706e-07     2.694937e-08
+Postprocess
+Iter     f(x) inf-norm    Step 2-norm 
+------   --------------   --------------
+     0     5.063767e-02              NaN
+     1     9.300542e-03     2.684705e+02
+     2     1.650977e-03     1.715141e+01
+     3     3.852914e-04     2.208156e-01
+     4     9.081244e-05     7.915075e-03
+     5     2.759753e-05     5.612899e-04
+     6     8.832138e-06     5.407407e-05
+     7     2.774243e-06     5.273972e-06
+     8     8.668290e-07     5.126838e-07
+Info    : Reading '/gpfs/scratch1/nodespecific/int4/colomeso/tests/PerforatedCylinder.jl/data/meshes/tmp_coarse.msh'...
+Info    : 37 entities
+Info    : 154 nodes
+Info    : 330 elements
+Info    : Done reading '/gpfs/scratch1/nodespecific/int4/colomeso/tests/PerforatedCylinder.jl/data/meshes/tmp_coarse.msh'
+Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+Postprocess
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+  Linear solve converged due to CONVERGED_ITS iterations 1
+
+JOB STATISTICS
+==============
+Job ID: 6990680
+Cluster: snellius
+User/Group: colomeso/colomeso
+State: COMPLETED (exit code 0)
+Nodes: 1
+Cores per node: 16
+CPU Utilized: 00:53:09
+CPU Efficiency: 6.13% of 14:26:40 core-walltime
+Job Wall-clock time: 00:54:10
+Memory Utilized: 6.23 GB
+Memory Efficiency: 22.24% of 28.00 GB

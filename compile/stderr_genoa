@@ -1,0 +1,13 @@
+    Building MPI → `~/.julia/scratchspaces/44cfe95a-1eb2-52ea-b672-e2afdf69b78f/d56a80d8cf8b9dc3050116346b3d83432b1912c0/build.log`
+Precompiling project...
+[32m  ✓ [39mPerforatedCylinder
+  1 dependency successfully precompiled in 22 seconds. 170 already precompiled.
+[36m[1m[ [22m[39m[36m[1mInfo: [22m[39mPackageCompiler: Executing /gpfs/home3/colomeso/repos/PerforatedCylinder.jl/compile/warmup.jl => /scratch-local/colomeso.6990680/jl_packagecompiler_fZTE37/jl_tqISsR
+[33m[1m┌ [22m[39m[33m[1mWarning: [22m[39mdetected extension '.0' does not correspond to dataset type.
+[33m[1m│ [22m[39mAppending '.vtu' to filename.
+[33m[1m└ [22m[39m[90m@ WriteVTK ~/.julia/packages/WriteVTK/bpvaJ/src/WriteVTK.jl:147[39m
+[33m[1m┌ [22m[39m[33m[1mWarning: [22m[39mdetected extension '.0_1' does not correspond to dataset type.
+[33m[1m│ [22m[39mAppending '.vtu' to filename.
+[33m[1m└ [22m[39m[90m@ WriteVTK ~/.julia/packages/WriteVTK/bpvaJ/src/WriteVTK.jl:147[39m
+[36m[1m[ [22m[39m[36m[1mInfo: [22m[39mPackageCompiler: Done
+- PackageCompiler: compiling incremental system image
